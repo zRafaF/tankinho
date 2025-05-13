@@ -1,0 +1,6 @@
+{
+  "cSpell.words": ["oneof", "TANKINHO"],
+  "protoc": {
+    "options": ["--proto_path=lib/proto"]
+  }
+}
