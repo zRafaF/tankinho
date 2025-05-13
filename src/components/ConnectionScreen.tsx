@@ -1,29 +1,35 @@
-import { useState, useEffect } from "react";
+// src/components/ConnectionScreen.tsx
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useGameConnection } from "@/hooks/useGameConnection";
+import { useEffect, useState } from "react";
 
-interface ConnectionScreenProps {
-  onCreateGame: () => void;
-  onJoinGame: (code: string) => void;
-}
+export default function ConnectionScreen() {
+  const [localCode, setLocalCode] = useState("");
+  const {
+    connectionState,
+    error,
+    createMatch,
+    joinMatch,
+    roomCode,
+    isConnected,
+    isConnecting,
+  } = useGameConnection();
 
-export default function ConnectionScreen({
-  onCreateGame,
-  onJoinGame,
-}: ConnectionScreenProps) {
-  const [roomCode, setRoomCode] = useState("");
-  const [isCodeValid, setIsCodeValid] = useState(false);
+  const isCodeValid = /^\d{4}$/.test(localCode);
 
   useEffect(() => {
-    setIsCodeValid(/^\d{4}$/.test(roomCode));
+    if (roomCode) {
+      setLocalCode(roomCode);
+    }
   }, [roomCode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase();
     if (value.length <= 4) {
-      setRoomCode(value);
+      setLocalCode(value);
     }
   };
 
@@ -38,13 +44,24 @@ export default function ConnectionScreen({
           TANKINHO
         </h1>
 
+        {(isConnecting || !isConnected) && (
+          <div className="text-center text-purple-300 mb-4">
+            {isConnecting
+              ? "Connecting to server..."
+              : "Connection lost. Trying to reconnect..."}
+          </div>
+        )}
+
+        {error && <div className="text-center text-red-400 mb-4">{error}</div>}
+
         <div className="space-y-6">
           <Button
-            onClick={onCreateGame}
+            onClick={createMatch}
+            disabled={!isConnected}
             className="w-full h-14 text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border-2 border-purple-400/30 shadow-lg"
           >
             <Sparkles className="mr-2 h-5 w-5" />
-            Create New Game
+            {roomCode ? `Room Code: ${roomCode}` : "Create New Game"}
           </Button>
 
           <div className="relative flex items-center">
@@ -55,16 +72,17 @@ export default function ConnectionScreen({
 
           <div className="space-y-4">
             <Input
-              value={roomCode}
+              value={localCode}
               onChange={handleInputChange}
               placeholder="ROOM CODE"
               className="h-14 text-center text-2xl font-mono bg-gray-900/60 border-2 border-purple-500/30 focus:border-purple-500"
               maxLength={4}
+              disabled={!isConnected}
             />
 
             <Button
-              onClick={() => isCodeValid && onJoinGame(roomCode)}
-              disabled={!isCodeValid}
+              onClick={() => joinMatch(localCode)}
+              disabled={!isCodeValid || !isConnected}
               className="w-full h-12 text-lg font-bold bg-gray-800 hover:bg-gray-700 disabled:opacity-50"
             >
               Join Game

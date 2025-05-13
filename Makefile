@@ -43,5 +43,8 @@ clean:
 	@$(RM) $(subst /,$(PATH_SEP),$(OUTPUT_TS_DIR)/*_pb.ts) 2>nul || echo "No files to clean"
 	@echo "Cleaned up generated typescript files"
 
+python:
+	@python server/main.py
+
 # Phony targets
 .PHONY: all proto clean
