@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+enum Turn {
+  TURN_HOST = 0;
+  TURN_GUEST = 1;
+  TURN_PHYSICS = 2;
+}
+
+message Vec2 {
+  float x = 1;
+  float y = 2;
+}
+
+message Bullet {
+  Vec2 position = 1;
+  Vec2 velocity = 2;
+}
+
+message Player {
+  Vec2 position = 1;
+  Vec2 velocity = 2;
+  float aim_angle = 3;
+  uint32 health = 4;
+  uint32 time_left = 5;
+}
+
+message DynamicUpdate {
+  Player host_player = 1;
+  Player guest_player = 2;
+
+  repeated Bullet bullets = 3;
+  Turn turn = 4;
+  Turn last_turn = 5;
+  
+}
+
+message TurnUpdate {
+  bytes bit_mask = 1;
+  Turn turn = 2;
+}
+
+message GameUpdate {
+  string match_id = 1;
+  oneof data {
+    DynamicUpdate dynamic_update = 1;
+    TurnUpdate turn_update = 2;
+  }
+}

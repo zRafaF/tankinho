@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+import "game.proto";
+import "match.proto";
+
+message ClientMessage {
+  oneof message {
+    GameUpdate game_update = 1;
+    CreateMatch create_match = 2;
+    JoinMatch join_match = 3;
+  }
+}
+
+message ServerMessage {
+  oneof message {
+    GameUpdate game_update = 1;
+    Error error = 2;
+    bool success = 3;
+  }
+}
+
+message Error {
+    string message = 1;
+    Type type = 2;    
+
+    enum Type {
+        ERROR_NONE = 0;
+        ERROR_MATCH_NOT_FOUND = 1;
+        ERROR_MATCH_FULL = 2;
+        ERROR_UNKNOWN = 3;
+    }
+}

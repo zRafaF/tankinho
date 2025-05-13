@@ -22,7 +22,7 @@ export default function ConnectionScreen({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase();
-    if (value.length <= 4 && /^[0-9]*$/.test(value)) {
+    if (value.length <= 4) {
       setRoomCode(value);
     }
   };
@@ -35,7 +35,7 @@ export default function ConnectionScreen({
         className="w-full max-w-md bg-black/40 backdrop-blur-sm rounded-xl border border-purple-500/20 p-8 shadow-xl"
       >
         <h1 className="text-4xl font-extrabold text-center mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
-          TANK BATTLE
+          TANKINHO
         </h1>
 
         <div className="space-y-6">
