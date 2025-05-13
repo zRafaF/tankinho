@@ -42,7 +42,7 @@ message TurnUpdate {
 message GameUpdate {
   string match_id = 1;
   oneof data {
-    DynamicUpdate dynamic_update = 1;
-    TurnUpdate turn_update = 2;
+    DynamicUpdate dynamic_update = 2;
+    TurnUpdate turn_update = 3;
   }
 }
