@@ -10,7 +10,7 @@ const ConnectionScreen: FunctionComponent = () => {
   const { error, createMatch, joinMatch, roomCode, isConnected, isConnecting } =
     useGameConnectionContext();
 
-  const isCodeValid = /^\d{4}$/.test(localCode);
+  const isCodeValid = localCode.length === 4;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase();
@@ -45,7 +45,7 @@ const ConnectionScreen: FunctionComponent = () => {
             className="w-full h-14 text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border-2 border-purple-400/30 shadow-lg"
           >
             <Sparkles className="mr-2 h-5 w-5" />
-            {roomCode ? `Room Code: ${roomCode}` : "Create New Game"}
+            Create New Game
           </Button>
 
           <div className="relative flex items-center">

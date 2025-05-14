@@ -1,5 +1,5 @@
 {
-  "cSpell.words": ["gameserver", "oneof", "TANKINHO"],
+  "cSpell.words": ["gameserver", "oneof", "Tankinho", "TANKINHO"],
   "protoc": {
     "options": ["--proto_path=lib/proto"]
   }
