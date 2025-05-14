@@ -1,42 +1,20 @@
-// src/components/ConnectionScreen.tsx
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useGameConnection } from "@/hooks/useGameConnection";
-import { useEffect, useState, type FunctionComponent } from "react";
+import { useState, type FunctionComponent } from "react";
+import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 
-interface ConnectionScreenProps {
-  onCreateHost: (id: string) => void;
-  onJoinGame: (id: string) => void;
-}
-
-const ConnectionScreen: FunctionComponent<ConnectionScreenProps> = ({
-  onCreateHost,
-  onJoinGame,
-}) => {
+const ConnectionScreen: FunctionComponent = () => {
   const [localCode, setLocalCode] = useState("");
   const { error, createMatch, joinMatch, roomCode, isConnected, isConnecting } =
-    useGameConnection({
-      joined: (h: boolean, matchId: string) => {
-        console.log(`Joined match: ${matchId} as ${h ? "host" : "guest"}`);
-
-        if (h && matchId) {
-          onCreateHost(matchId);
-        }
-        if (!h && matchId) {
-          onJoinGame(matchId);
-        }
-      },
-    });
+    useGameConnectionContext();
 
   const isCodeValid = /^\d{4}$/.test(localCode);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase();
-    if (value.length <= 4) {
-      setLocalCode(value);
-    }
+    if (value.length <= 4) setLocalCode(value);
   };
 
   return (

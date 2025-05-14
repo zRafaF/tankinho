@@ -2,34 +2,39 @@ import { useState } from "react";
 import { Stage, Layer, Rect, Text, Group } from "react-konva";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Copy, CheckCircle, Loader2 } from "lucide-react";
-import { useGameConnection } from "@/hooks/useGameConnection";
+import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 
 interface GameScreenProps {
-  roomCode: string;
-  isHost: boolean;
   gameStarted: boolean;
   onExitGame: () => void;
 }
 
 export default function GameScreen({
-  roomCode,
-  isHost,
   gameStarted,
   onExitGame,
 }: GameScreenProps) {
   const [health] = useState(100);
   const [copied, setCopied] = useState(false);
   const [playerPos] = useState({ x: 100, y: 300 });
-  const { disconnectFromMatch } = useGameConnection({});
+
+  // Consume connection context
+  const { roomCode, isHost, disconnectFromMatch } = useGameConnectionContext();
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
   // Terrain generation
   const generateTerrain = () => {
-    const terrain = [];
+    const terrain: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      color: string;
+    }[] = [];
     const groundLevel = 300;
 
     // Flat ground
@@ -60,7 +65,6 @@ export default function GameScreen({
 
   const handleExit = () => {
     console.log("Exiting game...");
-
     disconnectFromMatch();
     onExitGame();
   };
