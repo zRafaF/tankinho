@@ -16,29 +16,21 @@ const ConnectionScreen: FunctionComponent<ConnectionScreenProps> = ({
   onJoinGame,
 }) => {
   const [localCode, setLocalCode] = useState("");
-  const {
-    connectionState,
-    error,
-    createMatch,
-    joinMatch,
-    roomCode,
-    isConnected,
-    isConnecting,
-  } = useGameConnection({
-    guestJoined: () => {
-      if (roomCode) {
-        onJoinGame(roomCode);
-      }
-    },
-  });
+  const { error, createMatch, joinMatch, roomCode, isConnected, isConnecting } =
+    useGameConnection({
+      joined: (h: boolean, matchId: string) => {
+        console.log(`Joined match: ${matchId} as ${h ? "host" : "guest"}`);
+
+        if (h && matchId) {
+          onCreateHost(matchId);
+        }
+        if (!h && matchId) {
+          onJoinGame(matchId);
+        }
+      },
+    });
 
   const isCodeValid = /^\d{4}$/.test(localCode);
-
-  useEffect(() => {
-    if (roomCode) {
-      onCreateHost(roomCode);
-    }
-  }, [roomCode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toUpperCase();

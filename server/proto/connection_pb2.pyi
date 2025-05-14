@@ -7,20 +7,22 @@ from typing import ClassVar as _ClassVar, Mapping as _Mapping, Optional as _Opti
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ClientMessage(_message.Message):
-    __slots__ = ("game_update", "create_match", "join_match", "client_flags")
+    __slots__ = ("game_update", "create_match", "join_match", "client_flags", "disconnect_match")
     class ClientFlags(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = ()
-        CLIENT_DISCONNECT_FROM_MATCH: _ClassVar[ClientMessage.ClientFlags]
-    CLIENT_DISCONNECT_FROM_MATCH: ClientMessage.ClientFlags
+        NONE: _ClassVar[ClientMessage.ClientFlags]
+    NONE: ClientMessage.ClientFlags
     GAME_UPDATE_FIELD_NUMBER: _ClassVar[int]
     CREATE_MATCH_FIELD_NUMBER: _ClassVar[int]
     JOIN_MATCH_FIELD_NUMBER: _ClassVar[int]
     CLIENT_FLAGS_FIELD_NUMBER: _ClassVar[int]
+    DISCONNECT_MATCH_FIELD_NUMBER: _ClassVar[int]
     game_update: _game_pb2.GameUpdate
     create_match: bool
     join_match: str
     client_flags: ClientMessage.ClientFlags
-    def __init__(self, game_update: _Optional[_Union[_game_pb2.GameUpdate, _Mapping]] = ..., create_match: bool = ..., join_match: _Optional[str] = ..., client_flags: _Optional[_Union[ClientMessage.ClientFlags, str]] = ...) -> None: ...
+    disconnect_match: str
+    def __init__(self, game_update: _Optional[_Union[_game_pb2.GameUpdate, _Mapping]] = ..., create_match: bool = ..., join_match: _Optional[str] = ..., client_flags: _Optional[_Union[ClientMessage.ClientFlags, str]] = ..., disconnect_match: _Optional[str] = ...) -> None: ...
 
 class ServerMessage(_message.Message):
     __slots__ = ("game_update", "error", "success", "match_created", "match_joined", "server_flags")

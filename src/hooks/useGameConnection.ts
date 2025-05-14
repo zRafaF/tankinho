@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from "react";
 import {
   ClientMessageSchema,
   ServerMessageSchema,
-  ClientMessage_ClientFlags,
   ServerMessage_ServerFlags,
 } from "@/gen/proto/connection_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
@@ -11,7 +10,7 @@ import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
 interface UseGameConnectionProps {
-  joined?: () => void;
+  joined?: (isHost: boolean, matchId: string) => void;
   startMatch?: () => void;
 }
 
@@ -69,7 +68,7 @@ export function useGameConnection({
             setPlayerId(matchData.playerId);
             setIsHost(true);
             if (joined) {
-              joined();
+              joined(true, matchData.matchId);
             }
             break;
 
@@ -79,7 +78,7 @@ export function useGameConnection({
             setPlayerId(matchJoinedData.playerId);
             setIsHost(false);
             if (joined) {
-              joined();
+              joined(false, matchJoinedData.matchId);
             }
             break;
 
@@ -144,16 +143,17 @@ export function useGameConnection({
   const disconnectFromMatch = useCallback(() => {
     console.log({
       socket,
-      connectionState,
+      roomCode,
     });
 
     if (!socket) return;
 
     try {
+      if (!roomCode) throw new Error("Match ID is not set");
+
       const message = create(ClientMessageSchema);
-      message.message.case = "clientFlags";
-      message.message.value =
-        ClientMessage_ClientFlags.CLIENT_DISCONNECT_FROM_MATCH;
+      message.message.case = "disconnectMatch";
+      message.message.value = roomCode;
 
       socket.send(toBinary(ClientMessageSchema, message));
     } catch (e) {
@@ -165,6 +165,8 @@ export function useGameConnection({
   return {
     connectionState,
     roomCode,
+    playerId,
+    isHost,
     error,
     createMatch,
     joinMatch,

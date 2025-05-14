@@ -4,7 +4,7 @@ import "game.proto";
 
 message ClientMessage {
   enum ClientFlags {
-    CLIENT_DISCONNECT_FROM_MATCH = 0;
+    NONE = 0;
   }
   
   oneof message {
@@ -12,7 +12,7 @@ message ClientMessage {
     bool create_match = 2;
     string join_match = 3;
     ClientFlags client_flags = 4;
-    
+    string disconnect_match = 5; // match id
   }
 }
 

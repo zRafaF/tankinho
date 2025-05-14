@@ -26,12 +26,15 @@ class GameServer:
                 client_msg = ClientMessage()
                 client_msg.ParseFromString(message)
 
-                if client_msg.HasField("create_match"):
+                if client_msg.create_match:
                     await self.handle_create_match(websocket)
-                elif client_msg.HasField("join_match"):
+                elif client_msg.join_match:
                     await self.handle_join_match(websocket, client_msg.join_match)
-                elif client_msg.HasField("client_flags"):
+                elif client_msg.client_flags:
                     await self.handle_client_flags(websocket, client_msg.client_flags)
+                elif client_msg.disconnect_match:
+                    print(f"Match disconnected: {client_msg.disconnect_match}")
+                    await self.handle_disconnect(client_msg.disconnect_match)
 
         except websockets.exceptions.ConnectionClosed:
             await self.handle_disconnect(websocket)
@@ -40,8 +43,8 @@ class GameServer:
         self, websocket: websockets.ServerConnection, flags: ClientMessage.ClientFlags
     ):
         print(f"Client flags received: {flags}")
-        if flags == ClientMessage.ClientFlags.CLIENT_DISCONNECT_FROM_MATCH:
-            await self.handle_disconnect(websocket)
+        if flags == ClientMessage.ClientFlags.NONE:
+            print("Client flags: NONE")
 
     async def handle_create_match(self, websocket: websockets.ServerConnection):
         while True:
@@ -52,9 +55,8 @@ class GameServer:
         self.matches[match_id] = Match(websocket, None)
 
         response = ServerMessage()
-        response.match_created = ServerMessage.MatchCreationOrJoin(
-            match_id=match_id, player_id=get_player_id()
-        )
+        response.match_created.match_id = match_id
+        response.match_created.player_id = get_player_id()
         await websocket.send(response.SerializeToString())
 
         print(f"Match created: {match_id}")
@@ -80,24 +82,13 @@ class GameServer:
         match.guest_connection = websocket
 
         success = ServerMessage()
-        success.guest_joined = True
+        success.server_flags = ServerMessage.SERVER_START_MATCH
         await match.guest_connection.send(success.SerializeToString())
         await match.host_connection.send(success.SerializeToString())
 
         print(f"Guest player has joined match: {match_id}")
 
-    def _find_match(self, websocket: websockets.ServerConnection):
-        for match_id, match in self.matches.items():
-            if (match.host_connection is websocket) or (
-                match.guest_connection is websocket
-            ):
-                return match_id
-        return None
-
-    async def handle_disconnect(self, websocket: websockets.ServerConnection):
-        match_id = self._find_match(websocket)
-
-        print(f"Current matches: {self.matches}")
+    async def handle_disconnect(self, match_id: str):
         print(f"Match ID for disconnecting websocket: {match_id}")
 
         if not match_id:
@@ -105,18 +96,20 @@ class GameServer:
 
         match = self.matches[match_id]
 
-        if websocket is match.host_connection:
-            if match.guest_connection is not None:
-                error = ServerMessage()
-                error.error.message = "Host disconnected"
-                error.error.type = Error.ERROR_HOST_DISCONNECTED
-                await match.guest_connection.send(error.SerializeToString())
-        elif websocket is match.guest_connection:
-            if match.host_connection is not None:
-                error = ServerMessage()
-                error.error.message = "Guest disconnected"
-                error.error.type = Error.ERROR_GUEST_DISCONNECTED
-                await match.host_connection.send(error.SerializeToString())
+        if match is None:
+            print(f"Match not found for ID: {match_id}")
+            return
+
+        if match.guest_connection is not None:
+            error = ServerMessage()
+            error.error.message = "Host disconnected"
+            error.error.type = Error.ERROR_HOST_DISCONNECTED
+            await match.guest_connection.send(error.SerializeToString())
+        if match.host_connection is not None:
+            error = ServerMessage()
+            error.error.message = "Guest disconnected"
+            error.error.type = Error.ERROR_GUEST_DISCONNECTED
+            await match.host_connection.send(error.SerializeToString())
 
         print(f"Player disconnected from match: {match_id}")
         del self.matches[match_id]

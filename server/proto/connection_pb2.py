@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 import game_pb2 as game__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10\x63onnection.proto\x1a\ngame.proto\"\xd1\x01\n\rClientMessage\x12\"\n\x0bgame_update\x18\x01 \x01(\x0b\x32\x0b.GameUpdateH\x00\x12\x16\n\x0c\x63reate_match\x18\x02 \x01(\x08H\x00\x12\x14\n\njoin_match\x18\x03 \x01(\tH\x00\x12\x32\n\x0c\x63lient_flags\x18\x04 \x01(\x0e\x32\x1a.ClientMessage.ClientFlagsH\x00\"/\n\x0b\x43lientFlags\x12 \n\x1c\x43LIENT_DISCONNECT_FROM_MATCH\x10\x00\x42\t\n\x07message\"\xfa\x02\n\rServerMessage\x12\"\n\x0bgame_update\x18\x01 \x01(\x0b\x32\x0b.GameUpdateH\x00\x12\x17\n\x05\x65rror\x18\x02 \x01(\x0b\x32\x06.ErrorH\x00\x12\x11\n\x07success\x18\x03 \x01(\x08H\x00\x12;\n\rmatch_created\x18\x04 \x01(\x0b\x32\".ServerMessage.MatchCreationOrJoinH\x00\x12:\n\x0cmatch_joined\x18\x05 \x01(\x0b\x32\".ServerMessage.MatchCreationOrJoinH\x00\x12\x32\n\x0cserver_flags\x18\x06 \x01(\x0e\x32\x1a.ServerMessage.ServerFlagsH\x00\x1a:\n\x13MatchCreationOrJoin\x12\x10\n\x08match_id\x18\x01 \x01(\t\x12\x11\n\tplayer_id\x18\x02 \x01(\r\"%\n\x0bServerFlags\x12\x16\n\x12SERVER_START_MATCH\x10\x00\x42\t\n\x07message\"\xcb\x01\n\x05\x45rror\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x19\n\x04type\x18\x02 \x01(\x0e\x32\x0b.Error.Type\"\x95\x01\n\x04Type\x12\x0e\n\nERROR_NONE\x10\x00\x12\x19\n\x15\x45RROR_MATCH_NOT_FOUND\x10\x01\x12\x14\n\x10\x45RROR_MATCH_FULL\x10\x02\x12\x11\n\rERROR_UNKNOWN\x10\x03\x12\x1b\n\x17\x45RROR_HOST_DISCONNECTED\x10\x04\x12\x1c\n\x18\x45RROR_GUEST_DISCONNECTED\x10\x05\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10\x63onnection.proto\x1a\ngame.proto\"\xd5\x01\n\rClientMessage\x12\"\n\x0bgame_update\x18\x01 \x01(\x0b\x32\x0b.GameUpdateH\x00\x12\x16\n\x0c\x63reate_match\x18\x02 \x01(\x08H\x00\x12\x14\n\njoin_match\x18\x03 \x01(\tH\x00\x12\x32\n\x0c\x63lient_flags\x18\x04 \x01(\x0e\x32\x1a.ClientMessage.ClientFlagsH\x00\x12\x1a\n\x10\x64isconnect_match\x18\x05 \x01(\tH\x00\"\x17\n\x0b\x43lientFlags\x12\x08\n\x04NONE\x10\x00\x42\t\n\x07message\"\xfa\x02\n\rServerMessage\x12\"\n\x0bgame_update\x18\x01 \x01(\x0b\x32\x0b.GameUpdateH\x00\x12\x17\n\x05\x65rror\x18\x02 \x01(\x0b\x32\x06.ErrorH\x00\x12\x11\n\x07success\x18\x03 \x01(\x08H\x00\x12;\n\rmatch_created\x18\x04 \x01(\x0b\x32\".ServerMessage.MatchCreationOrJoinH\x00\x12:\n\x0cmatch_joined\x18\x05 \x01(\x0b\x32\".ServerMessage.MatchCreationOrJoinH\x00\x12\x32\n\x0cserver_flags\x18\x06 \x01(\x0e\x32\x1a.ServerMessage.ServerFlagsH\x00\x1a:\n\x13MatchCreationOrJoin\x12\x10\n\x08match_id\x18\x01 \x01(\t\x12\x11\n\tplayer_id\x18\x02 \x01(\r\"%\n\x0bServerFlags\x12\x16\n\x12SERVER_START_MATCH\x10\x00\x42\t\n\x07message\"\xcb\x01\n\x05\x45rror\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x19\n\x04type\x18\x02 \x01(\x0e\x32\x0b.Error.Type\"\x95\x01\n\x04Type\x12\x0e\n\nERROR_NONE\x10\x00\x12\x19\n\x15\x45RROR_MATCH_NOT_FOUND\x10\x01\x12\x14\n\x10\x45RROR_MATCH_FULL\x10\x02\x12\x11\n\rERROR_UNKNOWN\x10\x03\x12\x1b\n\x17\x45RROR_HOST_DISCONNECTED\x10\x04\x12\x1c\n\x18\x45RROR_GUEST_DISCONNECTED\x10\x05\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,17 +33,17 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'connection_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_CLIENTMESSAGE']._serialized_start=33
-  _globals['_CLIENTMESSAGE']._serialized_end=242
-  _globals['_CLIENTMESSAGE_CLIENTFLAGS']._serialized_start=184
-  _globals['_CLIENTMESSAGE_CLIENTFLAGS']._serialized_end=231
-  _globals['_SERVERMESSAGE']._serialized_start=245
-  _globals['_SERVERMESSAGE']._serialized_end=623
-  _globals['_SERVERMESSAGE_MATCHCREATIONORJOIN']._serialized_start=515
-  _globals['_SERVERMESSAGE_MATCHCREATIONORJOIN']._serialized_end=573
-  _globals['_SERVERMESSAGE_SERVERFLAGS']._serialized_start=575
-  _globals['_SERVERMESSAGE_SERVERFLAGS']._serialized_end=612
-  _globals['_ERROR']._serialized_start=626
-  _globals['_ERROR']._serialized_end=829
-  _globals['_ERROR_TYPE']._serialized_start=680
-  _globals['_ERROR_TYPE']._serialized_end=829
+  _globals['_CLIENTMESSAGE']._serialized_end=246
+  _globals['_CLIENTMESSAGE_CLIENTFLAGS']._serialized_start=212
+  _globals['_CLIENTMESSAGE_CLIENTFLAGS']._serialized_end=235
+  _globals['_SERVERMESSAGE']._serialized_start=249
+  _globals['_SERVERMESSAGE']._serialized_end=627
+  _globals['_SERVERMESSAGE_MATCHCREATIONORJOIN']._serialized_start=519
+  _globals['_SERVERMESSAGE_MATCHCREATIONORJOIN']._serialized_end=577
+  _globals['_SERVERMESSAGE_SERVERFLAGS']._serialized_start=579
+  _globals['_SERVERMESSAGE_SERVERFLAGS']._serialized_end=616
+  _globals['_ERROR']._serialized_start=630
+  _globals['_ERROR']._serialized_end=833
+  _globals['_ERROR_TYPE']._serialized_start=684
+  _globals['_ERROR_TYPE']._serialized_end=833
 # @@protoc_insertion_point(module_scope)
