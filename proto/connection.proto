@@ -1,21 +1,38 @@
 syntax = "proto3";
 
 import "game.proto";
-import "match.proto";
 
 message ClientMessage {
+  enum ClientFlags {
+    CLIENT_DISCONNECT_FROM_MATCH = 0;
+  }
+  
   oneof message {
     GameUpdate game_update = 1;
-    CreateMatch create_match = 2;
-    JoinMatch join_match = 3;
+    bool create_match = 2;
+    string join_match = 3;
+    ClientFlags client_flags = 4;
+    
   }
 }
 
 message ServerMessage {
+  message MatchCreationOrJoin {
+    string match_id = 1;
+    uint32 player_id = 2;
+  }
+
+  enum ServerFlags {
+    SERVER_START_MATCH = 0;
+  }
+
   oneof message {
     GameUpdate game_update = 1;
     Error error = 2;
     bool success = 3;
+    MatchCreationOrJoin match_created = 4;
+    MatchCreationOrJoin match_joined = 5;
+    ServerFlags server_flags = 6;
   }
 }
 
@@ -28,5 +45,7 @@ message Error {
         ERROR_MATCH_NOT_FOUND = 1;
         ERROR_MATCH_FULL = 2;
         ERROR_UNKNOWN = 3;
+        ERROR_HOST_DISCONNECTED = 4;
+        ERROR_GUEST_DISCONNECTED = 5;
     }
 }

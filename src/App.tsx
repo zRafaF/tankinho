@@ -13,15 +13,6 @@ export default function App() {
     status: "connecting",
   });
 
-  const handleCreateGame = () => {
-    const code = generateRoomCode();
-    setGameState({
-      status: "waiting",
-      roomCode: code,
-      isHost: true,
-    });
-  };
-
   return (
     <div className="w-full h-screen bg-gray-900">
       {gameState.status === "connecting" ? (
@@ -33,7 +24,13 @@ export default function App() {
               isHost: false,
             });
           }}
-          onCreateGame={handleCreateGame}
+          onCreateHost={(code) => {
+            setGameState({
+              status: "waiting",
+              roomCode: code,
+              isHost: true,
+            });
+          }}
         />
       ) : (
         <GameScreen

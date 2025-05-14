@@ -6,15 +6,13 @@ import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv1"
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv1";
 import type { GameUpdate } from "./game_pb";
 import { file_game } from "./game_pb";
-import type { CreateMatch, JoinMatch } from "./match_pb";
-import { file_match } from "./match_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file connection.proto.
  */
 export const file_connection: GenFile = /*@__PURE__*/
-  fileDesc("ChBjb25uZWN0aW9uLnByb3RvIoYBCg1DbGllbnRNZXNzYWdlEiIKC2dhbWVfdXBkYXRlGAEgASgLMgsuR2FtZVVwZGF0ZUgAEiQKDGNyZWF0ZV9tYXRjaBgCIAEoCzIMLkNyZWF0ZU1hdGNoSAASIAoKam9pbl9tYXRjaBgDIAEoCzIKLkpvaW5NYXRjaEgAQgkKB21lc3NhZ2UiagoNU2VydmVyTWVzc2FnZRIiCgtnYW1lX3VwZGF0ZRgBIAEoCzILLkdhbWVVcGRhdGVIABIXCgVlcnJvchgCIAEoCzIGLkVycm9ySAASEQoHc3VjY2VzcxgDIAEoCEgAQgkKB21lc3NhZ2UijwEKBUVycm9yEg8KB21lc3NhZ2UYASABKAkSGQoEdHlwZRgCIAEoDjILLkVycm9yLlR5cGUiWgoEVHlwZRIOCgpFUlJPUl9OT05FEAASGQoVRVJST1JfTUFUQ0hfTk9UX0ZPVU5EEAESFAoQRVJST1JfTUFUQ0hfRlVMTBACEhEKDUVSUk9SX1VOS05PV04QA2IGcHJvdG8z", [file_game, file_match]);
+  fileDesc("ChBjb25uZWN0aW9uLnByb3RvItEBCg1DbGllbnRNZXNzYWdlEiIKC2dhbWVfdXBkYXRlGAEgASgLMgsuR2FtZVVwZGF0ZUgAEhYKDGNyZWF0ZV9tYXRjaBgCIAEoCEgAEhQKCmpvaW5fbWF0Y2gYAyABKAlIABIyCgxjbGllbnRfZmxhZ3MYBCABKA4yGi5DbGllbnRNZXNzYWdlLkNsaWVudEZsYWdzSAAiLwoLQ2xpZW50RmxhZ3MSIAocQ0xJRU5UX0RJU0NPTk5FQ1RfRlJPTV9NQVRDSBAAQgkKB21lc3NhZ2Ui+gIKDVNlcnZlck1lc3NhZ2USIgoLZ2FtZV91cGRhdGUYASABKAsyCy5HYW1lVXBkYXRlSAASFwoFZXJyb3IYAiABKAsyBi5FcnJvckgAEhEKB3N1Y2Nlc3MYAyABKAhIABI7Cg1tYXRjaF9jcmVhdGVkGAQgASgLMiIuU2VydmVyTWVzc2FnZS5NYXRjaENyZWF0aW9uT3JKb2luSAASOgoMbWF0Y2hfam9pbmVkGAUgASgLMiIuU2VydmVyTWVzc2FnZS5NYXRjaENyZWF0aW9uT3JKb2luSAASMgoMc2VydmVyX2ZsYWdzGAYgASgOMhouU2VydmVyTWVzc2FnZS5TZXJ2ZXJGbGFnc0gAGjoKE01hdGNoQ3JlYXRpb25PckpvaW4SEAoIbWF0Y2hfaWQYASABKAkSEQoJcGxheWVyX2lkGAIgASgNIiUKC1NlcnZlckZsYWdzEhYKElNFUlZFUl9TVEFSVF9NQVRDSBAAQgkKB21lc3NhZ2UiywEKBUVycm9yEg8KB21lc3NhZ2UYASABKAkSGQoEdHlwZRgCIAEoDjILLkVycm9yLlR5cGUilQEKBFR5cGUSDgoKRVJST1JfTk9ORRAAEhkKFUVSUk9SX01BVENIX05PVF9GT1VORBABEhQKEEVSUk9SX01BVENIX0ZVTEwQAhIRCg1FUlJPUl9VTktOT1dOEAMSGwoXRVJST1JfSE9TVF9ESVNDT05ORUNURUQQBBIcChhFUlJPUl9HVUVTVF9ESVNDT05ORUNURUQQBWIGcHJvdG8z", [file_game]);
 
 /**
  * @generated from message ClientMessage
@@ -31,16 +29,22 @@ export type ClientMessage = Message<"ClientMessage"> & {
     case: "gameUpdate";
   } | {
     /**
-     * @generated from field: CreateMatch create_match = 2;
+     * @generated from field: bool create_match = 2;
      */
-    value: CreateMatch;
+    value: boolean;
     case: "createMatch";
   } | {
     /**
-     * @generated from field: JoinMatch join_match = 3;
+     * @generated from field: string join_match = 3;
      */
-    value: JoinMatch;
+    value: string;
     case: "joinMatch";
+  } | {
+    /**
+     * @generated from field: ClientMessage.ClientFlags client_flags = 4;
+     */
+    value: ClientMessage_ClientFlags;
+    case: "clientFlags";
   } | { case: undefined; value?: undefined };
 };
 
@@ -50,6 +54,22 @@ export type ClientMessage = Message<"ClientMessage"> & {
  */
 export const ClientMessageSchema: GenMessage<ClientMessage> = /*@__PURE__*/
   messageDesc(file_connection, 0);
+
+/**
+ * @generated from enum ClientMessage.ClientFlags
+ */
+export enum ClientMessage_ClientFlags {
+  /**
+   * @generated from enum value: CLIENT_DISCONNECT_FROM_MATCH = 0;
+   */
+  CLIENT_DISCONNECT_FROM_MATCH = 0,
+}
+
+/**
+ * Describes the enum ClientMessage.ClientFlags.
+ */
+export const ClientMessage_ClientFlagsSchema: GenEnum<ClientMessage_ClientFlags> = /*@__PURE__*/
+  enumDesc(file_connection, 0, 0);
 
 /**
  * @generated from message ServerMessage
@@ -76,6 +96,24 @@ export type ServerMessage = Message<"ServerMessage"> & {
      */
     value: boolean;
     case: "success";
+  } | {
+    /**
+     * @generated from field: ServerMessage.MatchCreationOrJoin match_created = 4;
+     */
+    value: ServerMessage_MatchCreationOrJoin;
+    case: "matchCreated";
+  } | {
+    /**
+     * @generated from field: ServerMessage.MatchCreationOrJoin match_joined = 5;
+     */
+    value: ServerMessage_MatchCreationOrJoin;
+    case: "matchJoined";
+  } | {
+    /**
+     * @generated from field: ServerMessage.ServerFlags server_flags = 6;
+     */
+    value: ServerMessage_ServerFlags;
+    case: "serverFlags";
   } | { case: undefined; value?: undefined };
 };
 
@@ -85,6 +123,44 @@ export type ServerMessage = Message<"ServerMessage"> & {
  */
 export const ServerMessageSchema: GenMessage<ServerMessage> = /*@__PURE__*/
   messageDesc(file_connection, 1);
+
+/**
+ * @generated from message ServerMessage.MatchCreationOrJoin
+ */
+export type ServerMessage_MatchCreationOrJoin = Message<"ServerMessage.MatchCreationOrJoin"> & {
+  /**
+   * @generated from field: string match_id = 1;
+   */
+  matchId: string;
+
+  /**
+   * @generated from field: uint32 player_id = 2;
+   */
+  playerId: number;
+};
+
+/**
+ * Describes the message ServerMessage.MatchCreationOrJoin.
+ * Use `create(ServerMessage_MatchCreationOrJoinSchema)` to create a new message.
+ */
+export const ServerMessage_MatchCreationOrJoinSchema: GenMessage<ServerMessage_MatchCreationOrJoin> = /*@__PURE__*/
+  messageDesc(file_connection, 1, 0);
+
+/**
+ * @generated from enum ServerMessage.ServerFlags
+ */
+export enum ServerMessage_ServerFlags {
+  /**
+   * @generated from enum value: SERVER_START_MATCH = 0;
+   */
+  SERVER_START_MATCH = 0,
+}
+
+/**
+ * Describes the enum ServerMessage.ServerFlags.
+ */
+export const ServerMessage_ServerFlagsSchema: GenEnum<ServerMessage_ServerFlags> = /*@__PURE__*/
+  enumDesc(file_connection, 1, 0);
 
 /**
  * @generated from message Error
@@ -131,6 +207,16 @@ export enum Error_Type {
    * @generated from enum value: ERROR_UNKNOWN = 3;
    */
   ERROR_UNKNOWN = 3,
+
+  /**
+   * @generated from enum value: ERROR_HOST_DISCONNECTED = 4;
+   */
+  ERROR_HOST_DISCONNECTED = 4,
+
+  /**
+   * @generated from enum value: ERROR_GUEST_DISCONNECTED = 5;
+   */
+  ERROR_GUEST_DISCONNECTED = 5,
 }
 
 /**

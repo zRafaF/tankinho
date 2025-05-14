@@ -4,9 +4,17 @@ import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGameConnection } from "@/hooks/useGameConnection";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FunctionComponent } from "react";
 
-export default function ConnectionScreen() {
+interface ConnectionScreenProps {
+  onCreateHost: (id: string) => void;
+  onJoinGame: (id: string) => void;
+}
+
+const ConnectionScreen: FunctionComponent<ConnectionScreenProps> = ({
+  onCreateHost,
+  onJoinGame,
+}) => {
   const [localCode, setLocalCode] = useState("");
   const {
     connectionState,
@@ -16,13 +24,19 @@ export default function ConnectionScreen() {
     roomCode,
     isConnected,
     isConnecting,
-  } = useGameConnection();
+  } = useGameConnection({
+    guestJoined: () => {
+      if (roomCode) {
+        onJoinGame(roomCode);
+      }
+    },
+  });
 
   const isCodeValid = /^\d{4}$/.test(localCode);
 
   useEffect(() => {
     if (roomCode) {
-      setLocalCode(roomCode);
+      onCreateHost(roomCode);
     }
   }, [roomCode]);
 
@@ -92,4 +106,6 @@ export default function ConnectionScreen() {
       </motion.div>
     </div>
   );
-}
+};
+
+export default ConnectionScreen;

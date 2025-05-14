@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Stage, Layer, Rect, Text, Group } from "react-konva";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Copy, CheckCircle, Loader2 } from "lucide-react";
+import { useGameConnection } from "@/hooks/useGameConnection";
 
 interface GameScreenProps {
   roomCode: string;
@@ -19,6 +20,7 @@ export default function GameScreen({
   const [health] = useState(100);
   const [copied, setCopied] = useState(false);
   const [playerPos] = useState({ x: 100, y: 300 });
+  const { disconnectFromMatch } = useGameConnection({});
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -56,6 +58,13 @@ export default function GameScreen({
     return terrain;
   };
 
+  const handleExit = () => {
+    console.log("Exiting game...");
+
+    disconnectFromMatch();
+    onExitGame();
+  };
+
   return (
     <div className="relative w-full h-screen bg-gray-900">
       {/* Waiting Overlay */}
@@ -81,7 +90,7 @@ export default function GameScreen({
               </button>
             </div>
             <Button
-              onClick={onExitGame}
+              onClick={handleExit}
               variant="outline"
               size="sm"
               className="mt-4 bg-black/50 border-red-500/30 hover:bg-red-900/30 text-white"
@@ -156,7 +165,7 @@ export default function GameScreen({
       {/* UI Controls */}
       <div className="absolute top-4 left-4 flex items-center gap-4">
         <Button
-          onClick={onExitGame}
+          onClick={handleExit}
           variant="outline"
           size="sm"
           className="bg-black/50 border-red-500/30 hover:bg-red-900/30 text-white"

@@ -3,18 +3,29 @@ import { useState, useEffect, useCallback } from "react";
 import {
   ClientMessageSchema,
   ServerMessageSchema,
+  ClientMessage_ClientFlags,
+  ServerMessage_ServerFlags,
 } from "@/gen/proto/connection_pb";
-import { CreateMatchSchema, JoinMatchSchema } from "@/gen/proto/match_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
-export function useGameConnection() {
+interface UseGameConnectionProps {
+  joined?: () => void;
+  startMatch?: () => void;
+}
+
+export function useGameConnection({
+  joined,
+  startMatch,
+}: UseGameConnectionProps) {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("connecting");
   const [roomCode, setRoomCode] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [playerId, setPlayerId] = useState<number | null>(null);
+  const [isHost, setIsHost] = useState<boolean>(false);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -42,17 +53,48 @@ export function useGameConnection() {
         const data = new Uint8Array(event.data);
         const serverMessage = fromBinary(ServerMessageSchema, data);
 
-        if (serverMessage.message.case === "error") {
-          setError(serverMessage.message.value.message);
-          return;
-        }
+        console.log("Received message:", serverMessage);
 
-        if (serverMessage.message.case === "success") {
-          // Handle successful match creation/join
-          setError("");
-        }
+        switch (serverMessage.message.case) {
+          case "error":
+            setError(serverMessage.message.value.message);
+            return;
+          case "success":
+            setError("");
+            break;
 
-        // Add other message handlers here
+          case "matchCreated":
+            const matchData = serverMessage.message.value;
+            setRoomCode(matchData.matchId);
+            setPlayerId(matchData.playerId);
+            setIsHost(true);
+            if (joined) {
+              joined();
+            }
+            break;
+
+          case "matchJoined":
+            const matchJoinedData = serverMessage.message.value;
+            setRoomCode(matchJoinedData.matchId);
+            setPlayerId(matchJoinedData.playerId);
+            setIsHost(false);
+            if (joined) {
+              joined();
+            }
+            break;
+
+          case "serverFlags":
+            const flags = serverMessage.message.value;
+            if (flags === ServerMessage_ServerFlags.SERVER_START_MATCH) {
+              if (startMatch) {
+                startMatch();
+              }
+            }
+            break;
+
+          default:
+            break;
+        }
       } catch (e) {
         setError("Invalid server response");
         console.error("Message parsing error:", e);
@@ -72,9 +114,7 @@ export function useGameConnection() {
     try {
       const message = create(ClientMessageSchema);
       message.message.case = "createMatch";
-      message.message.value = create(CreateMatchSchema, {
-        matchId: "abcd", // Replace with actual match ID generation logic
-      });
+      message.message.value = true;
 
       socket.send(toBinary(ClientMessageSchema, message));
     } catch (e) {
@@ -90,9 +130,7 @@ export function useGameConnection() {
       try {
         const message = create(ClientMessageSchema);
         message.message.case = "joinMatch";
-        message.message.value = create(JoinMatchSchema, {
-          matchId: code,
-        });
+        message.message.value = code;
 
         socket.send(toBinary(ClientMessageSchema, message));
       } catch (e) {
@@ -103,12 +141,34 @@ export function useGameConnection() {
     [socket, connectionState]
   );
 
+  const disconnectFromMatch = useCallback(() => {
+    console.log({
+      socket,
+      connectionState,
+    });
+
+    if (!socket) return;
+
+    try {
+      const message = create(ClientMessageSchema);
+      message.message.case = "clientFlags";
+      message.message.value =
+        ClientMessage_ClientFlags.CLIENT_DISCONNECT_FROM_MATCH;
+
+      socket.send(toBinary(ClientMessageSchema, message));
+    } catch (e) {
+      setError("Failed to disconnect from match");
+      console.error("Disconnect error:", e);
+    }
+  }, [socket]);
+
   return {
     connectionState,
     roomCode,
     error,
     createMatch,
     joinMatch,
+    disconnectFromMatch,
     isConnected: connectionState === "connected",
     isConnecting: connectionState === "connecting",
   };
