@@ -4,12 +4,16 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Copy, CheckCircle } from "lucide-react";
 import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 import {
-  TERRAIN_BLOCK_SIDE,
-  TERRAIN_WIDTH,
-  TERRAIN_HEIGHT,
+  ENVIRONMENT_WIDTH,
+  ENVIRONMENT_HEIGHT,
+  BLOCK_SIZE,
   PLAYER_SPEED,
   INITIAL_PLAYER_POS,
 } from "@/config/gameConfig";
+import {
+  getEnvironmentBit,
+  createInitialBitmask,
+} from "@/lib/environmentUtils";
 
 interface GameScreenProps {
   onExitGame: () => void;
@@ -21,16 +25,23 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
   const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
   const [movingLeft, setMovingLeft] = useState(false);
   const [movingRight, setMovingRight] = useState(false);
-  const { roomCode, disconnectFromMatch, isHost } = useGameConnectionContext();
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+  const { roomCode, disconnectFromMatch } = useGameConnectionContext();
 
-  // Initialize terrain bitmask (bottom 3 rows filled)
-  const [terrainBitmask] = useState(() =>
-    Array.from({ length: TERRAIN_HEIGHT }, (_, y) =>
-      Array.from({ length: TERRAIN_WIDTH }, (_, x) =>
-        y >= TERRAIN_HEIGHT - 3 ? 1 : 0
-      )
-    )
-  );
+  const [environmentBitmask] = useState<Uint8Array>(createInitialBitmask);
+
+  // Responsive handling
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Keyboard controls
   useEffect(() => {
@@ -52,13 +63,13 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
     };
   }, []);
 
-  // Game loop for player movement
+  // Game loop
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = performance.now();
 
     const update = (time: number) => {
-      const deltaTime = (time - lastTime) / 1000; // Convert to seconds
+      const deltaTime = (time - lastTime) / 1000;
       lastTime = time;
 
       setPlayerPos((prev) => {
@@ -66,8 +77,7 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
         if (movingLeft) newX -= PLAYER_SPEED * deltaTime;
         if (movingRight) newX += PLAYER_SPEED * deltaTime;
 
-        // Keep player within terrain bounds
-        newX = Math.max(0, Math.min(newX, TERRAIN_WIDTH - 1));
+        newX = Math.max(0, Math.min(newX, ENVIRONMENT_WIDTH - 1));
         return { ...prev, x: newX };
       });
 
@@ -77,6 +87,38 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
     animationFrameId = requestAnimationFrame(update);
     return () => cancelAnimationFrame(animationFrameId);
   }, [movingLeft, movingRight]);
+
+  // Calculate responsive block size
+  const scale = Math.min(
+    windowSize.width / (ENVIRONMENT_WIDTH * BLOCK_SIZE),
+    windowSize.height / (ENVIRONMENT_HEIGHT * BLOCK_SIZE)
+  );
+  const scaledBlockSize = BLOCK_SIZE * scale;
+
+  // Convert player position to screen space
+  const screenX = playerPos.x * scaledBlockSize;
+  const screenY = playerPos.y * scaledBlockSize;
+
+  // Generate environment blocks
+  const environmentBlocks = [];
+  for (let y = 0; y < ENVIRONMENT_HEIGHT; y++) {
+    for (let x = 0; x < ENVIRONMENT_WIDTH; x++) {
+      if (getEnvironmentBit(environmentBitmask, x, y)) {
+        environmentBlocks.push(
+          <Rect
+            key={`${x}-${y}`}
+            x={x * scaledBlockSize}
+            y={y * scaledBlockSize}
+            width={scaledBlockSize}
+            height={scaledBlockSize}
+            fill={x % 2 === 0 ? "#4a6b3f" : "#3a5530"}
+            stroke="#2d3b27"
+            strokeWidth={2 * scale}
+          />
+        );
+      }
+    }
+  }
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -89,67 +131,51 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
     onExitGame();
   };
 
-  // Convert player position to screen space
-  const screenX = playerPos.x * TERRAIN_BLOCK_SIDE;
-  const screenY = playerPos.y * TERRAIN_BLOCK_SIDE;
-
   return (
     <div className="relative w-full h-screen bg-gray-900">
       <Stage
-        width={window.innerWidth}
-        height={window.innerHeight}
+        width={ENVIRONMENT_WIDTH * scaledBlockSize}
+        height={ENVIRONMENT_HEIGHT * scaledBlockSize}
         className="absolute inset-0"
+        scaleX={scale}
+        scaleY={scale}
       >
         <Layer>
-          {/* Render terrain */}
-          {terrainBitmask.flatMap((row, y) =>
-            row.map((cell, x) =>
-              cell === 1 ? (
-                <Rect
-                  key={`${x}-${y}`}
-                  x={x * TERRAIN_BLOCK_SIDE}
-                  y={y * TERRAIN_BLOCK_SIDE}
-                  width={TERRAIN_BLOCK_SIDE}
-                  height={TERRAIN_BLOCK_SIDE}
-                  fill={x % 2 === 0 ? "#4a6b3f" : "#3a5530"}
-                  stroke="#2d3b27"
-                  strokeWidth={2}
-                />
-              ) : null
-            )
-          )}
+          {environmentBlocks}
 
           {/* Player */}
           <Group x={screenX} y={screenY}>
-            <Group x={-TERRAIN_BLOCK_SIDE / 2} y={-TERRAIN_BLOCK_SIDE * 1.5}>
+            {/* Health bar */}
+            <Group x={-scaledBlockSize * 0.75} y={-scaledBlockSize * 1.5}>
               <Rect
-                width={TERRAIN_BLOCK_SIDE}
-                height={TERRAIN_BLOCK_SIDE / 4}
+                width={scaledBlockSize * 1.5}
+                height={scaledBlockSize * 0.25}
                 fill="#444"
-                cornerRadius={3}
+                cornerRadius={3 * scale}
               />
               <Rect
-                width={(health / 100) * TERRAIN_BLOCK_SIDE}
-                height={TERRAIN_BLOCK_SIDE / 4}
+                width={(health / 100) * scaledBlockSize * 1.5}
+                height={scaledBlockSize * 0.25}
                 fill={health > 50 ? "#4ade80" : "#f87171"}
-                cornerRadius={3}
+                cornerRadius={3 * scale}
               />
               <Text
                 text={`${health}%`}
-                x={4}
-                y={-2}
-                fontSize={TERRAIN_BLOCK_SIDE / 3}
+                x={4 * scale}
+                y={-2 * scale}
+                fontSize={scaledBlockSize / 3}
                 fill="white"
               />
             </Group>
 
+            {/* Tank body */}
             <Rect
-              x={-TERRAIN_BLOCK_SIDE / 2}
-              y={-TERRAIN_BLOCK_SIDE / 2}
-              width={TERRAIN_BLOCK_SIDE}
-              height={TERRAIN_BLOCK_SIDE}
+              x={-scaledBlockSize / 2}
+              y={-scaledBlockSize / 2}
+              width={scaledBlockSize}
+              height={scaledBlockSize}
               fill="#555"
-              cornerRadius={4}
+              cornerRadius={4 * scale}
             />
           </Group>
         </Layer>
