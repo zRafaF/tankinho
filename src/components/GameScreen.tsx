@@ -1,9 +1,15 @@
-// components/GameScreen.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Stage, Layer, Rect, Text, Group } from "react-konva";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Copy, CheckCircle } from "lucide-react";
 import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
+import {
+  TERRAIN_BLOCK_SIDE,
+  TERRAIN_WIDTH,
+  TERRAIN_HEIGHT,
+  PLAYER_SPEED,
+  INITIAL_PLAYER_POS,
+} from "@/config/gameConfig";
 
 interface GameScreenProps {
   onExitGame: () => void;
@@ -12,8 +18,65 @@ interface GameScreenProps {
 export default function GameScreen({ onExitGame }: GameScreenProps) {
   const [health] = useState(100);
   const [copied, setCopied] = useState(false);
-  const [playerPos] = useState({ x: 100, y: 300 });
-  const { roomCode, disconnectFromMatch } = useGameConnectionContext();
+  const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
+  const [movingLeft, setMovingLeft] = useState(false);
+  const [movingRight, setMovingRight] = useState(false);
+  const { roomCode, disconnectFromMatch, isHost } = useGameConnectionContext();
+
+  // Initialize terrain bitmask (bottom 3 rows filled)
+  const [terrainBitmask] = useState(() =>
+    Array.from({ length: TERRAIN_HEIGHT }, (_, y) =>
+      Array.from({ length: TERRAIN_WIDTH }, (_, x) =>
+        y >= TERRAIN_HEIGHT - 3 ? 1 : 0
+      )
+    )
+  );
+
+  // Keyboard controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "a") setMovingLeft(true);
+      if (e.key === "d") setMovingRight(true);
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "a") setMovingLeft(false);
+      if (e.key === "d") setMovingRight(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  // Game loop for player movement
+  useEffect(() => {
+    let animationFrameId: number;
+    let lastTime = performance.now();
+
+    const update = (time: number) => {
+      const deltaTime = (time - lastTime) / 1000; // Convert to seconds
+      lastTime = time;
+
+      setPlayerPos((prev) => {
+        let newX = prev.x;
+        if (movingLeft) newX -= PLAYER_SPEED * deltaTime;
+        if (movingRight) newX += PLAYER_SPEED * deltaTime;
+
+        // Keep player within terrain bounds
+        newX = Math.max(0, Math.min(newX, TERRAIN_WIDTH - 1));
+        return { ...prev, x: newX };
+      });
+
+      animationFrameId = requestAnimationFrame(update);
+    };
+
+    animationFrameId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [movingLeft, movingRight]);
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -21,44 +84,14 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const generateTerrain = () => {
-    const terrain: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      color: string;
-    }[] = [];
-    const groundLevel = 300;
-
-    for (let x = 0; x < 700; x += 40) {
-      terrain.push({
-        x,
-        y: groundLevel,
-        width: 40,
-        height: 40,
-        color: x % 80 === 0 ? "#4a6b3f" : "#3a5530",
-      });
-    }
-
-    for (let x = 300; x < 500; x += 40) {
-      const height = 300 - Math.sin((x - 300) * 0.05) * 40;
-      terrain.push({
-        x,
-        y: height,
-        width: 40,
-        height: 40,
-        color: "#3a5530",
-      });
-    }
-
-    return terrain;
-  };
-
   const handleExit = () => {
     disconnectFromMatch();
     onExitGame();
   };
+
+  // Convert player position to screen space
+  const screenX = playerPos.x * TERRAIN_BLOCK_SIDE;
+  const screenY = playerPos.y * TERRAIN_BLOCK_SIDE;
 
   return (
     <div className="relative w-full h-screen bg-gray-900">
@@ -68,57 +101,61 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
         className="absolute inset-0"
       >
         <Layer>
-          {generateTerrain().map((block, i) => (
-            <Rect
-              key={i}
-              x={block.x}
-              y={block.y}
-              width={block.width}
-              height={block.height}
-              fill={block.color}
-              stroke="#2d3b27"
-              strokeWidth={2}
-            />
-          ))}
+          {/* Render terrain */}
+          {terrainBitmask.flatMap((row, y) =>
+            row.map((cell, x) =>
+              cell === 1 ? (
+                <Rect
+                  key={`${x}-${y}`}
+                  x={x * TERRAIN_BLOCK_SIDE}
+                  y={y * TERRAIN_BLOCK_SIDE}
+                  width={TERRAIN_BLOCK_SIDE}
+                  height={TERRAIN_BLOCK_SIDE}
+                  fill={x % 2 === 0 ? "#4a6b3f" : "#3a5530"}
+                  stroke="#2d3b27"
+                  strokeWidth={2}
+                />
+              ) : null
+            )
+          )}
 
-          <Group x={playerPos.x} y={playerPos.y}>
-            <Group x={-30} y={-40}>
-              <Rect width={60} height={10} fill="#444" cornerRadius={3} />
+          {/* Player */}
+          <Group x={screenX} y={screenY}>
+            <Group x={-TERRAIN_BLOCK_SIDE / 2} y={-TERRAIN_BLOCK_SIDE * 1.5}>
               <Rect
-                width={health * 0.6}
-                height={10}
+                width={TERRAIN_BLOCK_SIDE}
+                height={TERRAIN_BLOCK_SIDE / 4}
+                fill="#444"
+                cornerRadius={3}
+              />
+              <Rect
+                width={(health / 100) * TERRAIN_BLOCK_SIDE}
+                height={TERRAIN_BLOCK_SIDE / 4}
                 fill={health > 50 ? "#4ade80" : "#f87171"}
                 cornerRadius={3}
               />
               <Text
                 text={`${health}%`}
-                x={2}
+                x={4}
                 y={-2}
-                fontSize={12}
+                fontSize={TERRAIN_BLOCK_SIDE / 3}
                 fill="white"
               />
             </Group>
 
             <Rect
-              x={-20}
-              y={-10}
-              width={40}
-              height={20}
+              x={-TERRAIN_BLOCK_SIDE / 2}
+              y={-TERRAIN_BLOCK_SIDE / 2}
+              width={TERRAIN_BLOCK_SIDE}
+              height={TERRAIN_BLOCK_SIDE}
               fill="#555"
               cornerRadius={4}
-            />
-            <Rect
-              x={-15}
-              y={-15}
-              width={30}
-              height={10}
-              fill="#666"
-              cornerRadius={3}
             />
           </Group>
         </Layer>
       </Stage>
 
+      {/* UI Elements */}
       <div className="absolute top-4 left-4 flex items-center gap-4">
         <Button
           onClick={handleExit}
