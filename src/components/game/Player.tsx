@@ -1,5 +1,5 @@
 import { Group, Rect, Text } from "react-konva";
-import { ENVIRONMENT_WIDTH } from "@/config/gameConfig";
+import { PLAYER_WIDTH, PLAYER_HEIGHT } from "@/config/gameConfig";
 
 interface PlayerProps {
   x: number;
@@ -9,18 +9,22 @@ interface PlayerProps {
 }
 
 export function Player({ x, y, health, blockSize }: PlayerProps) {
+  const playerWidth = PLAYER_WIDTH * blockSize;
+  const playerHeight = PLAYER_HEIGHT * blockSize;
+
   return (
     <Group x={x} y={y}>
-      <Group x={-blockSize * 0.75} y={-blockSize * 1.5}>
+      {/* Health bar positioned above player */}
+      <Group x={-playerWidth * 0.75} y={-playerHeight * 1.5}>
         <Rect
-          width={blockSize * 1.5}
-          height={blockSize * 0.25}
+          width={playerWidth * 1.5}
+          height={playerHeight * 0.25}
           fill="#444"
           cornerRadius={Math.max(2, blockSize * 0.075)}
         />
         <Rect
-          width={(health / 100) * blockSize * 1.5}
-          height={blockSize * 0.25}
+          width={(health / 100) * playerWidth * 1.5}
+          height={playerHeight * 0.25}
           fill={health > 50 ? "#4ade80" : "#f87171"}
           cornerRadius={Math.max(2, blockSize * 0.075)}
         />
@@ -32,11 +36,13 @@ export function Player({ x, y, health, blockSize }: PlayerProps) {
           fill="white"
         />
       </Group>
+
+      {/* Player body */}
       <Rect
-        x={-blockSize / 2}
-        y={-blockSize / 2}
-        width={blockSize}
-        height={blockSize}
+        x={-playerWidth / 2}
+        y={-playerHeight / 2}
+        width={playerWidth}
+        height={playerHeight}
         fill="#555"
         cornerRadius={Math.max(3, blockSize * 0.1)}
       />

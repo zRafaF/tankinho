@@ -4,11 +4,19 @@ import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 import {
   ENVIRONMENT_WIDTH,
   ENVIRONMENT_HEIGHT,
-  BLOCK_SIZE,
+  BASE_BLOCK_SIZE,
   PLAYER_SPEED,
+  PLAYER_GRAVITY,
+  PLAYER_MAX_STEP_OVER,
   INITIAL_PLAYER_POS,
+  PLAYER_HEIGHT,
+  PLAYER_WIDTH,
 } from "@/config/gameConfig";
-import { createInitialBitmask } from "@/lib/environmentUtils";
+import {
+  createTerrain,
+  canStepOver,
+  getEnvironmentBit,
+} from "@/lib/environmentUtils";
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
 import { GameUI } from "@/components/game/GameUI";
@@ -21,6 +29,7 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
   const [health] = useState(100);
   const [copied, setCopied] = useState(false);
   const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
+  const [playerVelocity, setPlayerVelocity] = useState({ x: 0, y: 0 });
   const [movingLeft, setMovingLeft] = useState(false);
   const [movingRight, setMovingRight] = useState(false);
   const [windowSize, setWindowSize] = useState({
@@ -29,7 +38,7 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
   });
   const { roomCode, disconnectFromMatch } = useGameConnectionContext();
 
-  const [environmentBitmask] = useState<Uint8Array>(createInitialBitmask);
+  const [environmentBitmask] = useState<Uint8Array>(createTerrain);
 
   // Full-width responsive scaling
   useEffect(() => {
@@ -61,7 +70,7 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
     };
   }, []);
 
-  // Game loop
+  // Game loop with physics
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = performance.now();
@@ -71,12 +80,62 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
       lastTime = time;
 
       setPlayerPos((prev) => {
-        let newX = prev.x;
-        if (movingLeft) newX -= PLAYER_SPEED * deltaTime;
-        if (movingRight) newX += PLAYER_SPEED * deltaTime;
+        setPlayerVelocity((vel) => {
+          // Apply gravity
+          let newVelY = vel.y + PLAYER_GRAVITY * deltaTime;
 
-        newX = Math.max(0, Math.min(newX, ENVIRONMENT_WIDTH - 1));
-        return { ...prev, x: newX };
+          // Horizontal movement
+          let newVelX = 0;
+          if (movingLeft) newVelX = -PLAYER_SPEED;
+          if (movingRight) newVelX = PLAYER_SPEED;
+
+          return { x: newVelX, y: newVelY };
+        });
+
+        const newPos = {
+          x: prev.x + playerVelocity.x * deltaTime,
+          y: prev.y + playerVelocity.y * deltaTime,
+        };
+
+        // Keep within horizontal bounds
+        newPos.x = Math.max(0, Math.min(newPos.x, ENVIRONMENT_WIDTH - 1));
+
+        // Collision detection with terrain
+        const playerBottom = Math.floor(newPos.y + PLAYER_HEIGHT / 2);
+        const playerLeft = Math.floor(newPos.x - PLAYER_WIDTH / 2);
+        const playerRight = Math.floor(newPos.x + PLAYER_WIDTH / 2);
+
+        // Check if we hit ground
+        let onGround = false;
+        for (let x = playerLeft; x <= playerRight; x++) {
+          if (getEnvironmentBit(environmentBitmask, x, playerBottom + 1)) {
+            onGround = true;
+            break;
+          }
+        }
+
+        // If moving horizontally, check step height
+        if (playerVelocity.x !== 0 && !onGround) {
+          const stepCheckY = playerBottom + 1;
+          const canStep = canStepOver(
+            environmentBitmask,
+            newPos.x,
+            stepCheckY,
+            PLAYER_MAX_STEP_OVER
+          );
+
+          if (!canStep) {
+            newPos.x = prev.x; // Block horizontal movement
+          }
+        }
+
+        // If on ground, stop vertical movement
+        if (onGround) {
+          newPos.y = playerBottom - PLAYER_HEIGHT / 2;
+          setPlayerVelocity((vel) => ({ ...vel, y: 0 }));
+        }
+
+        return newPos;
       });
 
       animationFrameId = requestAnimationFrame(update);
@@ -84,7 +143,7 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
 
     animationFrameId = requestAnimationFrame(update);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [movingLeft, movingRight]);
+  }, [movingLeft, movingRight, playerVelocity, environmentBitmask]);
 
   // Calculate responsive scaling
   const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
