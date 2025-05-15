@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
-import { Stage, Layer, Rect, Text, Group } from "react-konva";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Copy, CheckCircle } from "lucide-react";
+import { Stage, Layer } from "react-konva";
 import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 import {
   ENVIRONMENT_WIDTH,
@@ -10,10 +8,10 @@ import {
   PLAYER_SPEED,
   INITIAL_PLAYER_POS,
 } from "@/config/gameConfig";
-import {
-  getEnvironmentBit,
-  createInitialBitmask,
-} from "@/lib/environmentUtils";
+import { createInitialBitmask } from "@/lib/environmentUtils";
+import { Environment } from "@/components/game/Environment";
+import { Player } from "@/components/game/Player";
+import { GameUI } from "@/components/game/GameUI";
 
 interface GameScreenProps {
   onExitGame: () => void;
@@ -33,7 +31,7 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
 
   const [environmentBitmask] = useState<Uint8Array>(createInitialBitmask);
 
-  // Responsive handling
+  // Full-width responsive scaling
   useEffect(() => {
     const handleResize = () => {
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -88,37 +86,13 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
     return () => cancelAnimationFrame(animationFrameId);
   }, [movingLeft, movingRight]);
 
-  // Calculate responsive block size
-  const scale = Math.min(
-    windowSize.width / (ENVIRONMENT_WIDTH * BLOCK_SIZE),
-    windowSize.height / (ENVIRONMENT_HEIGHT * BLOCK_SIZE)
-  );
-  const scaledBlockSize = BLOCK_SIZE * scale;
+  // Calculate responsive scaling
+  const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
+  const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
 
   // Convert player position to screen space
-  const screenX = playerPos.x * scaledBlockSize;
-  const screenY = playerPos.y * scaledBlockSize;
-
-  // Generate environment blocks
-  const environmentBlocks = [];
-  for (let y = 0; y < ENVIRONMENT_HEIGHT; y++) {
-    for (let x = 0; x < ENVIRONMENT_WIDTH; x++) {
-      if (getEnvironmentBit(environmentBitmask, x, y)) {
-        environmentBlocks.push(
-          <Rect
-            key={`${x}-${y}`}
-            x={x * scaledBlockSize}
-            y={y * scaledBlockSize}
-            width={scaledBlockSize}
-            height={scaledBlockSize}
-            fill={x % 2 === 0 ? "#4a6b3f" : "#3a5530"}
-            stroke="#2d3b27"
-            strokeWidth={2 * scale}
-          />
-        );
-      }
-    }
-  }
+  const screenX = playerPos.x * blockSize;
+  const screenY = playerPos.y * blockSize;
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -132,81 +106,29 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
   };
 
   return (
-    <div className="relative w-full h-screen bg-gray-900">
+    <div className="relative w-full h-screen bg-gray-900 overflow-hidden">
       <Stage
-        width={ENVIRONMENT_WIDTH * scaledBlockSize}
-        height={ENVIRONMENT_HEIGHT * scaledBlockSize}
-        className="absolute inset-0"
-        scaleX={scale}
-        scaleY={scale}
+        width={windowSize.width}
+        height={stageHeight}
+        className="absolute top-1/2 left-0 transform -translate-y-1/2"
       >
+        <Environment bitmask={environmentBitmask} blockSize={blockSize} />
         <Layer>
-          {environmentBlocks}
-
-          {/* Player */}
-          <Group x={screenX} y={screenY}>
-            {/* Health bar */}
-            <Group x={-scaledBlockSize * 0.75} y={-scaledBlockSize * 1.5}>
-              <Rect
-                width={scaledBlockSize * 1.5}
-                height={scaledBlockSize * 0.25}
-                fill="#444"
-                cornerRadius={3 * scale}
-              />
-              <Rect
-                width={(health / 100) * scaledBlockSize * 1.5}
-                height={scaledBlockSize * 0.25}
-                fill={health > 50 ? "#4ade80" : "#f87171"}
-                cornerRadius={3 * scale}
-              />
-              <Text
-                text={`${health}%`}
-                x={4 * scale}
-                y={-2 * scale}
-                fontSize={scaledBlockSize / 3}
-                fill="white"
-              />
-            </Group>
-
-            {/* Tank body */}
-            <Rect
-              x={-scaledBlockSize / 2}
-              y={-scaledBlockSize / 2}
-              width={scaledBlockSize}
-              height={scaledBlockSize}
-              fill="#555"
-              cornerRadius={4 * scale}
-            />
-          </Group>
+          <Player
+            x={screenX}
+            y={screenY}
+            health={health}
+            blockSize={blockSize}
+          />
         </Layer>
       </Stage>
 
-      {/* UI Elements */}
-      <div className="absolute top-4 left-4 flex items-center gap-4">
-        <Button
-          onClick={handleExit}
-          variant="outline"
-          size="sm"
-          className="bg-black/50 border-red-500/30 hover:bg-red-900/30 text-white"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Exit
-        </Button>
-
-        <div className="flex items-center gap-2 bg-black/50 px-3 py-1 rounded-lg border border-purple-500/30">
-          <span className="font-mono font-bold">{roomCode}</span>
-          <button
-            onClick={copyRoomCode}
-            className="text-gray-300 hover:text-white"
-          >
-            {copied ? (
-              <CheckCircle className="h-4 w-4" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-      </div>
+      <GameUI
+        roomCode={roomCode}
+        copied={copied}
+        onCopy={copyRoomCode}
+        onExit={handleExit}
+      />
     </div>
   );
 }
