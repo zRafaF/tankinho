@@ -1,4 +1,3 @@
-// src/contexts/GameConnectionContext.tsx
 import {
   createContext,
   useContext,

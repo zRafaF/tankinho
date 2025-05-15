@@ -24,6 +24,8 @@ export default function App() {
         });
       }}
       onJoinGuest={(matchId) => {
+        console.log(123);
+
         setGameState({
           status: "in-game",
           roomCode: matchId,

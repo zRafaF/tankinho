@@ -81,9 +81,13 @@ class GameServer:
 
         match.guest_connection = websocket
 
+        response = ServerMessage()
+        response.match_created.match_id = match_id
+        response.match_created.player_id = get_player_id()
+        await match.guest_connection.send(response.SerializeToString())
+
         success = ServerMessage()
         success.server_flags = ServerMessage.SERVER_START_MATCH
-        await match.guest_connection.send(success.SerializeToString())
         await match.host_connection.send(success.SerializeToString())
 
         print(f"Guest player has joined match: {match_id}")
