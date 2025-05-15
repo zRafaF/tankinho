@@ -34,28 +34,15 @@ export function setEnvironmentBit(
 
 export function createTerrain(): Uint8Array {
   const buffer = new Uint8Array(ENVIRONMENT_HEIGHT * BYTES_PER_ROW);
-  const { airRows, amplitude, frequency, flatBottomRows } = TERRAIN_CONFIG;
+  const { airRows, amplitude, frequency } = TERRAIN_CONFIG;
 
-  // Generate sine wave terrain
+  // Generate sine wave terrain starting after airRows
   for (let x = 0; x < ENVIRONMENT_WIDTH; x++) {
-    const waveHeight = Math.round(
-      amplitude * Math.sin(x * frequency) +
-        (ENVIRONMENT_HEIGHT - amplitude - flatBottomRows - airRows)
-    );
+    const waveHeight =
+      airRows + Math.round(amplitude * Math.sin(x * frequency));
 
-    // Fill from waveHeight down to bottom (leaving airRows at top)
-    for (let y = waveHeight + airRows; y < ENVIRONMENT_HEIGHT; y++) {
-      setEnvironmentBit(buffer, x, y);
-    }
-  }
-
-  // Ensure flat ground at the bottom
-  for (let x = 0; x < ENVIRONMENT_WIDTH; x++) {
-    for (
-      let y = ENVIRONMENT_HEIGHT - flatBottomRows;
-      y < ENVIRONMENT_HEIGHT;
-      y++
-    ) {
+    // Fill from waveHeight down to bottom
+    for (let y = waveHeight; y < ENVIRONMENT_HEIGHT; y++) {
       setEnvironmentBit(buffer, x, y);
     }
   }
@@ -63,16 +50,44 @@ export function createTerrain(): Uint8Array {
   return buffer;
 }
 
-// Helper function for collision detection
+export function isCollidingWithTerrain(
+  bitmask: Uint8Array,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): boolean {
+  const left = Math.floor(x - width / 2);
+  const right = Math.floor(x + width / 2);
+  const bottom = Math.floor(y + height / 2);
+
+  // Check along the bottom edge
+  for (let checkX = left; checkX <= right; checkX++) {
+    if (getEnvironmentBit(bitmask, checkX, bottom)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function canStepOver(
   bitmask: Uint8Array,
   x: number,
   y: number,
+  width: number,
   maxStep: number
-): boolean {
+): { canStep: boolean; newY?: number } {
+  const left = Math.floor(x - width / 2);
+  const right = Math.floor(x + width / 2);
+  const bottom = Math.floor(y);
+
+  // Check if there's ground within maxStep below
   for (let step = 1; step <= maxStep; step++) {
-    if (y + step >= ENVIRONMENT_HEIGHT) return true; // Bottom of world is always solid
-    if (getEnvironmentBit(bitmask, Math.round(x), y + step)) return true;
+    for (let checkX = left; checkX <= right; checkX++) {
+      if (getEnvironmentBit(bitmask, checkX, bottom + step)) {
+        return { canStep: true, newY: bottom + step - 0.5 }; // Position player on top
+      }
+    }
   }
-  return false;
+  return { canStep: false };
 }

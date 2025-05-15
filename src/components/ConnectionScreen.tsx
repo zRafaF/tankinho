@@ -16,7 +16,6 @@ const ConnectionScreen: FunctionComponent = () => {
     const value = e.target.value.toUpperCase();
     if (value.length <= 4) setLocalCode(value);
   };
-
   return (
     <div className="w-full h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-purple-950 to-gray-900">
       <motion.div
