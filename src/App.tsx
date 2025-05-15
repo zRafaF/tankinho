@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ConnectionScreen from "@/components/ConnectionScreen";
 import GameScreen from "@/components/GameScreen";
+import HostWaitingScreen from "@/components/HostWaitingScreen";
 import { GameConnectionProvider } from "./contexts/GameConnectionContext";
 
 export type GameState = {
@@ -24,12 +25,21 @@ export default function App() {
         });
       }}
       onJoinGuest={(matchId) => {
-        console.log(123);
-
         setGameState({
           status: "in-game",
           roomCode: matchId,
           isHost: false,
+        });
+      }}
+      onStartMatch={() => {
+        setGameState((prev) => ({
+          ...prev,
+          status: "in-game",
+        }));
+      }}
+      onOtherPlayerDisconnected={() => {
+        setGameState({
+          status: "connecting",
         });
       }}
     >
@@ -37,10 +47,16 @@ export default function App() {
         {gameState.status === "connecting" ? (
           <ConnectionScreen />
         ) : (
-          <GameScreen
-            gameStarted={gameState.status === "in-game"}
-            onExitGame={() => setGameState({ status: "connecting" })}
-          />
+          <>
+            <GameScreen
+              onExitGame={() => setGameState({ status: "connecting" })}
+            />
+            {gameState.status === "waiting" && gameState.isHost && (
+              <HostWaitingScreen
+                onExit={() => setGameState({ status: "connecting" })}
+              />
+            )}
+          </>
         )}
       </div>
     </GameConnectionProvider>

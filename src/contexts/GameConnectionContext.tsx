@@ -7,6 +7,7 @@ import {
 } from "react";
 import {
   ClientMessageSchema,
+  Error_Type,
   ServerMessageSchema,
   ServerMessage_ServerFlags,
 } from "@/gen/proto/connection_pb";
@@ -46,6 +47,7 @@ interface GameConnectionProviderProps {
   onCreateHost: (matchId: string) => void;
   onJoinGuest: (matchId: string) => void;
   onStartMatch?: () => void;
+  onOtherPlayerDisconnected?: () => void;
 }
 
 export const GameConnectionProvider = ({
@@ -53,6 +55,7 @@ export const GameConnectionProvider = ({
   onCreateHost,
   onJoinGuest,
   onStartMatch,
+  onOtherPlayerDisconnected,
 }: GameConnectionProviderProps) => {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("connecting");
@@ -89,6 +92,19 @@ export const GameConnectionProvider = ({
         switch (serverMessage.message.case) {
           case "error":
             setError(serverMessage.message.value.message);
+
+            switch (serverMessage.message.value.type) {
+              case Error_Type.ERROR_HOST_DISCONNECTED:
+              case Error_Type.ERROR_GUEST_DISCONNECTED:
+                console.log("Player disconnected");
+
+                onOtherPlayerDisconnected?.();
+                break;
+
+              default:
+                break;
+            }
+
             break;
 
           case "success":

@@ -89,6 +89,7 @@ class GameServer:
         success = ServerMessage()
         success.server_flags = ServerMessage.SERVER_START_MATCH
         await match.host_connection.send(success.SerializeToString())
+        await match.guest_connection.send(success.SerializeToString())
 
         print(f"Guest player has joined match: {match_id}")
 
