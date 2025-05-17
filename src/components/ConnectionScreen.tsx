@@ -7,7 +7,7 @@ import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 
 const ConnectionScreen: FunctionComponent = () => {
   const [localCode, setLocalCode] = useState("");
-  const { error, createMatch, joinMatch, roomCode, isConnected, isConnecting } =
+  const { error, createMatch, joinMatch, isConnected, isConnecting } =
     useGameConnectionContext();
 
   const isCodeValid = localCode.length === 4;

@@ -19,7 +19,6 @@ export function GameUI({
   onCopy,
   onExit,
   powerBars,
-  isCharging,
   turnTime,
   isTurnActive,
 }: GameUIProps) {

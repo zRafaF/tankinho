@@ -2,15 +2,22 @@
 // @generated from file game.proto (syntax proto3)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv1";
+import type {
+  GenEnum,
+  GenFile,
+  GenMessage,
+} from "@bufbuild/protobuf/codegenv1";
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv1";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file game.proto.
  */
-export const file_game: GenFile = /*@__PURE__*/
-  fileDesc("CgpnYW1lLnByb3RvIhwKBFZlYzISCQoBeBgBIAEoAhIJCgF5GAIgASgCIjoKBkJ1bGxldBIXCghwb3NpdGlvbhgBIAEoCzIFLlZlYzISFwoIdmVsb2NpdHkYAiABKAsyBS5WZWMyInAKBlBsYXllchIXCghwb3NpdGlvbhgBIAEoCzIFLlZlYzISFwoIdmVsb2NpdHkYAiABKAsyBS5WZWMyEhEKCWFpbV9hbmdsZRgDIAEoAhIOCgZoZWFsdGgYBCABKA0SEQoJdGltZV9sZWZ0GAUgASgNIpUBCg1EeW5hbWljVXBkYXRlEhwKC2hvc3RfcGxheWVyGAEgASgLMgcuUGxheWVyEh0KDGd1ZXN0X3BsYXllchgCIAEoCzIHLlBsYXllchIYCgdidWxsZXRzGAMgAygLMgcuQnVsbGV0EhMKBHR1cm4YBCABKA4yBS5UdXJuEhgKCWxhc3RfdHVybhgFIAEoDjIFLlR1cm4iMwoKVHVyblVwZGF0ZRIQCghiaXRfbWFzaxgBIAEoDBITCgR0dXJuGAIgASgOMgUuVHVybiJ0CgpHYW1lVXBkYXRlEhAKCG1hdGNoX2lkGAEgASgJEigKDmR5bmFtaWNfdXBkYXRlGAIgASgLMg4uRHluYW1pY1VwZGF0ZUgAEiIKC3R1cm5fdXBkYXRlGAMgASgLMgsuVHVyblVwZGF0ZUgAQgYKBGRhdGEqNwoEVHVybhINCglUVVJOX0hPU1QQABIOCgpUVVJOX0dVRVNUEAESEAoMVFVSTl9QSFlTSUNTEAJiBnByb3RvMw");
+export const file_game: GenFile =
+  /*@__PURE__*/
+  fileDesc(
+    "CgpnYW1lLnByb3RvIhwKBFZlYzISCQoBeBgBIAEoAhIJCgF5GAIgASgCIjoKBkJ1bGxldBIXCghwb3NpdGlvbhgBIAEoCzIFLlZlYzISFwoIdmVsb2NpdHkYAiABKAsyBS5WZWMyInAKBlBsYXllchIXCghwb3NpdGlvbhgBIAEoCzIFLlZlYzISFwoIdmVsb2NpdHkYAiABKAsyBS5WZWMyEhEKCWFpbV9hbmdsZRgDIAEoAhIOCgZoZWFsdGgYBCABKA0SEQoJdGltZV9sZWZ0GAUgASgNIpUBCg1EeW5hbWljVXBkYXRlEhwKC2hvc3RfcGxheWVyGAEgASgLMgcuUGxheWVyEh0KDGd1ZXN0X3BsYXllchgCIAEoCzIHLlBsYXllchIYCgdidWxsZXRzGAMgAygLMgcuQnVsbGV0EhMKBHR1cm4YBCABKA4yBS5UdXJuEhgKCWxhc3RfdHVybhgFIAEoDjIFLlR1cm4iMwoKVHVyblVwZGF0ZRIQCghiaXRfbWFzaxgBIAEoDBITCgR0dXJuGAIgASgOMgUuVHVybiJ0CgpHYW1lVXBkYXRlEhAKCG1hdGNoX2lkGAEgASgJEigKDmR5bmFtaWNfdXBkYXRlGAIgASgLMg4uRHluYW1pY1VwZGF0ZUgAEiIKC3R1cm5fdXBkYXRlGAMgASgLMgsuVHVyblVwZGF0ZUgAQgYKBGRhdGEqNwoEVHVybhINCglUVVJOX0hPU1QQABIOCgpUVVJOX0dVRVNUEAESEAoMVFVSTl9QSFlTSUNTEAJiBnByb3RvMw"
+  );
 
 /**
  * @generated from message Vec2
@@ -31,7 +38,8 @@ export type Vec2 = Message<"Vec2"> & {
  * Describes the message Vec2.
  * Use `create(Vec2Schema)` to create a new message.
  */
-export const Vec2Schema: GenMessage<Vec2> = /*@__PURE__*/
+export const Vec2Schema: GenMessage<Vec2> =
+  /*@__PURE__*/
   messageDesc(file_game, 0);
 
 /**
@@ -53,7 +61,8 @@ export type Bullet = Message<"Bullet"> & {
  * Describes the message Bullet.
  * Use `create(BulletSchema)` to create a new message.
  */
-export const BulletSchema: GenMessage<Bullet> = /*@__PURE__*/
+export const BulletSchema: GenMessage<Bullet> =
+  /*@__PURE__*/
   messageDesc(file_game, 1);
 
 /**
@@ -90,7 +99,8 @@ export type Player = Message<"Player"> & {
  * Describes the message Player.
  * Use `create(PlayerSchema)` to create a new message.
  */
-export const PlayerSchema: GenMessage<Player> = /*@__PURE__*/
+export const PlayerSchema: GenMessage<Player> =
+  /*@__PURE__*/
   messageDesc(file_game, 2);
 
 /**
@@ -127,7 +137,8 @@ export type DynamicUpdate = Message<"DynamicUpdate"> & {
  * Describes the message DynamicUpdate.
  * Use `create(DynamicUpdateSchema)` to create a new message.
  */
-export const DynamicUpdateSchema: GenMessage<DynamicUpdate> = /*@__PURE__*/
+export const DynamicUpdateSchema: GenMessage<DynamicUpdate> =
+  /*@__PURE__*/
   messageDesc(file_game, 3);
 
 /**
@@ -149,7 +160,8 @@ export type TurnUpdate = Message<"TurnUpdate"> & {
  * Describes the message TurnUpdate.
  * Use `create(TurnUpdateSchema)` to create a new message.
  */
-export const TurnUpdateSchema: GenMessage<TurnUpdate> = /*@__PURE__*/
+export const TurnUpdateSchema: GenMessage<TurnUpdate> =
+  /*@__PURE__*/
   messageDesc(file_game, 4);
 
 /**
@@ -164,26 +176,30 @@ export type GameUpdate = Message<"GameUpdate"> & {
   /**
    * @generated from oneof GameUpdate.data
    */
-  data: {
-    /**
-     * @generated from field: DynamicUpdate dynamic_update = 2;
-     */
-    value: DynamicUpdate;
-    case: "dynamicUpdate";
-  } | {
-    /**
-     * @generated from field: TurnUpdate turn_update = 3;
-     */
-    value: TurnUpdate;
-    case: "turnUpdate";
-  } | { case: undefined; value?: undefined };
+  data:
+    | {
+        /**
+         * @generated from field: DynamicUpdate dynamic_update = 2;
+         */
+        value: DynamicUpdate;
+        case: "dynamicUpdate";
+      }
+    | {
+        /**
+         * @generated from field: TurnUpdate turn_update = 3;
+         */
+        value: TurnUpdate;
+        case: "turnUpdate";
+      }
+    | { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message GameUpdate.
  * Use `create(GameUpdateSchema)` to create a new message.
  */
-export const GameUpdateSchema: GenMessage<GameUpdate> = /*@__PURE__*/
+export const GameUpdateSchema: GenMessage<GameUpdate> =
+  /*@__PURE__*/
   messageDesc(file_game, 5);
 
 /**
@@ -209,6 +225,4 @@ export enum Turn {
 /**
  * Describes the enum Turn.
  */
-export const TurnSchema: GenEnum<Turn> = /*@__PURE__*/
-  enumDesc(file_game, 0);
-
+export const TurnSchema: GenEnum<Turn> = /*@__PURE__*/ enumDesc(file_game, 0);
