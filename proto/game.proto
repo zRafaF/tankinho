@@ -3,7 +3,6 @@ syntax = "proto3";
 enum Turn {
   TURN_HOST = 0;
   TURN_GUEST = 1;
-  TURN_PHYSICS = 2;
 }
 
 message Vec2 {
@@ -30,8 +29,6 @@ message DynamicUpdate {
 
   repeated Bullet bullets = 3;
   Turn turn = 4;
-  Turn last_turn = 5;
-  
 }
 
 message TurnUpdate {

@@ -2,6 +2,7 @@ import sys
 
 sys.path.append("server/proto/")
 from proto.connection_pb2 import ClientMessage, ServerMessage, Error
+from proto.game_pb2 import GameUpdate
 import websockets
 from helpers import *
 
@@ -35,6 +36,8 @@ class GameServer:
                 elif client_msg.disconnect_match:
                     print(f"Match disconnected: {client_msg.disconnect_match}")
                     await self.handle_disconnect(client_msg.disconnect_match)
+                elif client_msg.game_update:
+                    await self.handle_game_update(websocket, client_msg.game_update)
 
         except websockets.exceptions.ConnectionClosed:
             await self.handle_disconnect(websocket)
@@ -60,6 +63,11 @@ class GameServer:
         await websocket.send(response.SerializeToString())
 
         print(f"Match created: {match_id}")
+
+    async def handle_game_update(
+        self, websocket: websockets.ServerConnection, game_update: GameUpdate
+    ):
+        print(f"Game update received: {game_update}")
 
     async def handle_join_match(
         self, websocket: websockets.ServerConnection, match_id: str

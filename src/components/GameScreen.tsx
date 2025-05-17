@@ -22,6 +22,15 @@ import {
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
 import { GameUI } from "@/components/game/GameUI";
+import { create } from "@bufbuild/protobuf"; // Make sure this import is present
+
+import {
+  BulletSchema,
+  DynamicUpdateSchema,
+  PlayerSchema,
+  Turn,
+  Vec2Schema,
+} from "@/gen/proto/game_pb";
 
 interface Bullet {
   id: number;
@@ -40,7 +49,6 @@ interface Explosion {
 type RoundState = "player" | "bullet" | "other";
 
 export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
-  // --- Core State ---
   const [health, setHealth] = useState(100);
   const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
   const [turretAngle, setTurretAngle] = useState(0);
@@ -52,25 +60,116 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
 
   const [bitmask, setBitmask] = useState<Uint8Array>(() => createTerrain());
 
-  // --- Bullets & Explosions ---
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const nextBulletId = useRef(1);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
   const nextExplId = useRef(1);
   const explodedBullets = useRef<Set<number>>(new Set());
 
-  // --- UI Boilerplate ---
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight,
   });
-  const { roomCode, disconnectFromMatch } = useGameConnectionContext();
-  const stageRef = useRef<any>(null);
 
+  const {
+    roomCode,
+    disconnectFromMatch,
+    isHost,
+    currentTurn,
+    latestOpponentState,
+    sendDynamicUpdate,
+  } = useGameConnectionContext();
+
+  const stageRef = useRef<any>(null);
   const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
   const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
 
-  // — Resize Handler —
+  const isMyTurn = currentTurn === (isHost ? Turn.HOST : Turn.GUEST);
+
+  const [opponentPos, setOpponentPos] = useState({ x: 0, y: 0 });
+  const [opponentAngle, setOpponentAngle] = useState(0);
+  const [opponentHealth, setOpponentHealth] = useState(100);
+
+  // Sync opponent state when we receive it
+  useEffect(() => {
+    if (!latestOpponentState) return;
+    const opponentPlayer = isHost
+      ? latestOpponentState.guestPlayer
+      : latestOpponentState.hostPlayer;
+    if (opponentPlayer) {
+      setOpponentPos({
+        x: opponentPlayer.position?.x ?? 0,
+        y: opponentPlayer.position?.y ?? 0,
+      });
+      setOpponentAngle(opponentPlayer.aimAngle ?? 0);
+      setOpponentHealth(opponentPlayer.health ?? 100);
+    }
+  }, [latestOpponentState, isHost]);
+
+  // Send dynamic update every 300ms on our turn
+  const latestState = useRef({
+    playerPos,
+    turretAngle,
+    bullets,
+    health,
+    turnTime,
+    isHost,
+  });
+
+  // Keep the ref updated
+  useEffect(() => {
+    latestState.current = {
+      playerPos,
+      turretAngle,
+      bullets,
+      health,
+      turnTime,
+      isHost,
+    };
+  }, [playerPos, turretAngle, bullets, health, turnTime, isHost]);
+
+  useEffect(() => {
+    if (!isMyTurn || roundState === "other") return;
+
+    // Immediate first update
+    const sendUpdate = () => {
+      const { playerPos, turretAngle, bullets, health, turnTime, isHost } =
+        latestState.current;
+
+      const me = create(PlayerSchema, {
+        position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
+        velocity: create(Vec2Schema, { x: 0, y: 0 }),
+        aimAngle: turretAngle,
+        health,
+        timeLeft: turnTime,
+      });
+
+      const bulletMessages = bullets.map((b) =>
+        create(BulletSchema, {
+          position: create(Vec2Schema, { x: b.x, y: b.y }),
+          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+        })
+      );
+
+      const dynamic = create(DynamicUpdateSchema, {
+        hostPlayer: isHost ? me : undefined,
+        guestPlayer: !isHost ? me : undefined,
+        bullets: bulletMessages,
+        turn: isHost ? Turn.HOST : Turn.GUEST,
+      });
+
+      sendDynamicUpdate(dynamic);
+    };
+
+    // Send initial update immediately
+    sendUpdate();
+
+    // Then set up regular interval
+    const id = setInterval(sendUpdate, 300);
+
+    return () => clearInterval(id);
+  }, [isMyTurn, roundState, sendDynamicUpdate]); // Only essential dependencies
+
   useEffect(() => {
     const onResize = () =>
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -78,7 +177,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // — Player Turn Countdown —
   useEffect(() => {
     if (roundState !== "player") return;
     setTurnTime(TURN_TIME_SEC);
@@ -86,7 +184,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
       setTurnTime((t) => {
         if (t <= 1) {
           clearInterval(id);
-          console.log("🔚 Time up → handOverTurn()");
           setRoundState("other");
           return 0;
         }
@@ -96,17 +193,14 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => clearInterval(id);
   }, [roundState]);
 
-  // — Other Player Downtime —
   useEffect(() => {
     if (roundState !== "other") return;
     const id = window.setTimeout(() => {
-      console.log("🔁 Back to player turn");
       setRoundState("player");
     }, TURN_DELAY_MS);
     return () => clearTimeout(id);
   }, [roundState]);
 
-  // — Mouse to Turret (Player Phase) —
   useEffect(() => {
     if (roundState !== "player") return;
     const onMove = (e: MouseEvent) => {
@@ -120,7 +214,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => window.removeEventListener("mousemove", onMove);
   }, [roundState, playerPos, blockSize]);
 
-  // — Charge & Shoot (Player Phase) —
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       if (roundState !== "player") return;
@@ -133,7 +226,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
       if (roundState !== "player") return;
       if (e.code === "Space" && isCharging) {
         setIsCharging(false);
-        // Fire bullet
         const frac = powerBars / SHOOTING_POWER_BARS;
         const speed = frac * BULLET_SPEED_FACTOR;
         const vx = Math.cos(turretAngle) * speed;
@@ -143,7 +235,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
           ...bs,
           { id, x: playerPos.x, y: playerPos.y, vx, vy },
         ]);
-        console.log(`🔫 Fired! power ${powerBars}/${SHOOTING_POWER_BARS}`);
         setRoundState("bullet");
       }
     };
@@ -155,7 +246,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     };
   }, [roundState, isCharging, powerBars, turretAngle, playerPos]);
 
-  // — Charging Bars Interval —
   useEffect(() => {
     if (roundState !== "player" || !isCharging) return;
     const id = window.setInterval(() => {
@@ -164,7 +254,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => clearInterval(id);
   }, [roundState, isCharging]);
 
-  // — Bullet Physics & Collision (Bullet Phase) —
   useEffect(() => {
     if (roundState !== "bullet") return;
     let raf = 0;
@@ -179,7 +268,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
             return { ...b, x: b.x + b.vx * dt, y: b.y + nvy * dt, vy: nvy };
           })
           .filter((b) => {
-            // Out of bounds?
             if (
               b.x < 0 ||
               b.x > ENVIRONMENT_WIDTH ||
@@ -189,7 +277,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
               triggerExplosion(b.id, b.x, b.y);
               return false;
             }
-            // Terrain hit?
             const tx = Math.floor(b.x),
               ty = Math.floor(b.y);
             if (getEnvironmentBit(bitmask, tx, ty)) {
@@ -205,27 +292,22 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => cancelAnimationFrame(raf);
   }, [roundState, bitmask]);
 
-  // — End Bullet Phase when all bullets gone —
   useEffect(() => {
     if (roundState === "bullet" && bullets.length === 0) {
-      console.log("🛑 Bullet over → handOverTurn()");
       setRoundState("other");
     }
   }, [roundState, bullets.length]);
 
-  // — Explosion Handler (once per bullet) —
   const triggerExplosion = (bid: number, wx: number, wy: number) => {
     if (explodedBullets.current.has(bid)) return;
     explodedBullets.current.add(bid);
 
-    // Visual
     const eid = nextExplId.current++;
     setExplosions((es) => [...es, { id: eid, x: wx, y: wy }]);
     setTimeout(() => {
       setExplosions((es) => es.filter((e) => e.id !== eid));
     }, 1000);
 
-    // Terrain destruction
     const cx = Math.floor(wx),
       cy = Math.floor(wy);
     const newMask = Uint8Array.from(bitmask);
@@ -238,18 +320,12 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     }
     setBitmask(newMask);
 
-    // Player damage
     const dist2 = (playerPos.x - wx) ** 2 + (playerPos.y - wy) ** 2;
     if (dist2 <= EXPLOSION_RADIUS * EXPLOSION_RADIUS) {
-      setHealth((h) => {
-        const nh = Math.max(0, h - EXPLOSION_DAMAGE);
-        console.log(`💔 Player hit! health now ${nh}`);
-        return nh;
-      });
+      setHealth((h) => Math.max(0, h - EXPLOSION_DAMAGE));
     }
   };
 
-  // — Exit Handler —
   const handleExit = () => {
     disconnectFromMatch();
     onExitGame();
@@ -273,9 +349,19 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
             blockSize={blockSize}
             turretAngle={turretAngle}
             isTurnActive={roundState === "player"}
+            isLocalPlayer={true}
             onPositionChange={setPlayerPos}
           />
-
+          <Player
+            x={opponentPos.x}
+            y={opponentPos.y}
+            health={opponentHealth}
+            bitmask={bitmask}
+            blockSize={blockSize}
+            turretAngle={opponentAngle}
+            isTurnActive={false}
+            isLocalPlayer={false}
+          />
           {bullets.map((b) => (
             <Circle
               key={b.id}
@@ -285,7 +371,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
               fill="yellow"
             />
           ))}
-
           {explosions.map((e) => (
             <Ellipse
               key={e.id}
@@ -298,7 +383,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
           ))}
         </Layer>
       </Stage>
-
       <GameUI
         roomCode={roomCode}
         onExit={handleExit}

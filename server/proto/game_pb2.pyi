@@ -10,10 +10,8 @@ class Turn(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     TURN_HOST: _ClassVar[Turn]
     TURN_GUEST: _ClassVar[Turn]
-    TURN_PHYSICS: _ClassVar[Turn]
 TURN_HOST: Turn
 TURN_GUEST: Turn
-TURN_PHYSICS: Turn
 
 class Vec2(_message.Message):
     __slots__ = ("x", "y")
@@ -46,18 +44,16 @@ class Player(_message.Message):
     def __init__(self, position: _Optional[_Union[Vec2, _Mapping]] = ..., velocity: _Optional[_Union[Vec2, _Mapping]] = ..., aim_angle: _Optional[float] = ..., health: _Optional[int] = ..., time_left: _Optional[int] = ...) -> None: ...
 
 class DynamicUpdate(_message.Message):
-    __slots__ = ("host_player", "guest_player", "bullets", "turn", "last_turn")
+    __slots__ = ("host_player", "guest_player", "bullets", "turn")
     HOST_PLAYER_FIELD_NUMBER: _ClassVar[int]
     GUEST_PLAYER_FIELD_NUMBER: _ClassVar[int]
     BULLETS_FIELD_NUMBER: _ClassVar[int]
     TURN_FIELD_NUMBER: _ClassVar[int]
-    LAST_TURN_FIELD_NUMBER: _ClassVar[int]
     host_player: Player
     guest_player: Player
     bullets: _containers.RepeatedCompositeFieldContainer[Bullet]
     turn: Turn
-    last_turn: Turn
-    def __init__(self, host_player: _Optional[_Union[Player, _Mapping]] = ..., guest_player: _Optional[_Union[Player, _Mapping]] = ..., bullets: _Optional[_Iterable[_Union[Bullet, _Mapping]]] = ..., turn: _Optional[_Union[Turn, str]] = ..., last_turn: _Optional[_Union[Turn, str]] = ...) -> None: ...
+    def __init__(self, host_player: _Optional[_Union[Player, _Mapping]] = ..., guest_player: _Optional[_Union[Player, _Mapping]] = ..., bullets: _Optional[_Iterable[_Union[Bullet, _Mapping]]] = ..., turn: _Optional[_Union[Turn, str]] = ...) -> None: ...
 
 class TurnUpdate(_message.Message):
     __slots__ = ("bit_mask", "turn")

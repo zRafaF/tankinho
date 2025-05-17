@@ -19,7 +19,8 @@ interface PlayerProps {
   blockSize: number;
   turretAngle: number;
   isTurnActive: boolean;
-  onPositionChange: (pos: { x: number; y: number }) => void;
+  isLocalPlayer: boolean;
+  onPositionChange?: (pos: { x: number; y: number }) => void;
 }
 
 function PlayerInner({
@@ -30,13 +31,17 @@ function PlayerInner({
   blockSize,
   turretAngle,
   isTurnActive,
+  isLocalPlayer,
   onPositionChange,
 }: PlayerProps) {
   const posRef = useRef({ x, y });
   const [movingLeft, setMovingLeft] = React.useState(false);
   const [movingRight, setMovingRight] = React.useState(false);
 
+  // Movement logic only for local player
   useEffect(() => {
+    if (!isLocalPlayer) return;
+
     const down = (e: KeyboardEvent) => {
       if (!isTurnActive) return;
       if (e.key === "a") setMovingLeft(true);
@@ -53,9 +58,10 @@ function PlayerInner({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [isTurnActive]);
+  }, [isTurnActive, isLocalPlayer]);
 
   useEffect(() => {
+    if (!isLocalPlayer || !onPositionChange) return;
     let rafId: number;
     let lastTime = performance.now();
 
@@ -78,7 +84,6 @@ function PlayerInner({
         Math.min(newX, ENVIRONMENT_WIDTH - PLAYER_WIDTH / 2)
       );
 
-      // — side collision & step-over —
       const halfW = PLAYER_WIDTH / 2;
       const dir = vx > 0 ? 1 : vx < 0 ? -1 : 0;
       if (dir !== 0) {
@@ -104,7 +109,6 @@ function PlayerInner({
         }
       }
 
-      // — snap to ground —
       const colStart = Math.floor(newX - halfW);
       const colEnd = Math.floor(newX + halfW - 0.001);
       let groundRow = ENVIRONMENT_HEIGHT;
@@ -134,9 +138,15 @@ function PlayerInner({
 
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [movingLeft, movingRight, bitmask, isTurnActive, onPositionChange]);
+  }, [
+    movingLeft,
+    movingRight,
+    bitmask,
+    isTurnActive,
+    isLocalPlayer,
+    onPositionChange,
+  ]);
 
-  // — render —
   const pw = PLAYER_WIDTH * blockSize;
   const ph = PLAYER_HEIGHT * blockSize;
   const turretLen = 2 * blockSize;
@@ -144,7 +154,6 @@ function PlayerInner({
 
   return (
     <Group x={x * blockSize} y={y * blockSize}>
-      {/* Turret */}
       <Group rotation={(turretAngle * 180) / Math.PI}>
         <Rect
           x={0}
@@ -155,8 +164,6 @@ function PlayerInner({
           cornerRadius={blockSize * 0.05}
         />
       </Group>
-
-      {/* Health Bar */}
       <Group y={-ph * 1.2}>
         <Rect
           x={-pw * 0.75}
@@ -183,14 +190,12 @@ function PlayerInner({
           fill="white"
         />
       </Group>
-
-      {/* Body */}
       <Rect
         x={-pw / 2}
         y={-ph / 2}
         width={pw}
         height={ph}
-        fill="#555"
+        fill={isLocalPlayer ? "#555" : "#7c3aed"}
         cornerRadius={blockSize * 0.1}
       />
     </Group>
@@ -207,5 +212,6 @@ export const Player = React.memo(
     prev.bitmask === next.bitmask &&
     prev.turretAngle === next.turretAngle &&
     prev.isTurnActive === next.isTurnActive &&
+    prev.isLocalPlayer === next.isLocalPlayer &&
     prev.onPositionChange === next.onPositionChange
 );

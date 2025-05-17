@@ -24,25 +24,25 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\ngame.proto\"\x1c\n\x04Vec2\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\":\n\x06\x42ullet\x12\x17\n\x08position\x18\x01 \x01(\x0b\x32\x05.Vec2\x12\x17\n\x08velocity\x18\x02 \x01(\x0b\x32\x05.Vec2\"p\n\x06Player\x12\x17\n\x08position\x18\x01 \x01(\x0b\x32\x05.Vec2\x12\x17\n\x08velocity\x18\x02 \x01(\x0b\x32\x05.Vec2\x12\x11\n\taim_angle\x18\x03 \x01(\x02\x12\x0e\n\x06health\x18\x04 \x01(\r\x12\x11\n\ttime_left\x18\x05 \x01(\r\"\x95\x01\n\rDynamicUpdate\x12\x1c\n\x0bhost_player\x18\x01 \x01(\x0b\x32\x07.Player\x12\x1d\n\x0cguest_player\x18\x02 \x01(\x0b\x32\x07.Player\x12\x18\n\x07\x62ullets\x18\x03 \x03(\x0b\x32\x07.Bullet\x12\x13\n\x04turn\x18\x04 \x01(\x0e\x32\x05.Turn\x12\x18\n\tlast_turn\x18\x05 \x01(\x0e\x32\x05.Turn\"3\n\nTurnUpdate\x12\x10\n\x08\x62it_mask\x18\x01 \x01(\x0c\x12\x13\n\x04turn\x18\x02 \x01(\x0e\x32\x05.Turn\"t\n\nGameUpdate\x12\x10\n\x08match_id\x18\x01 \x01(\t\x12(\n\x0e\x64ynamic_update\x18\x02 \x01(\x0b\x32\x0e.DynamicUpdateH\x00\x12\"\n\x0bturn_update\x18\x03 \x01(\x0b\x32\x0b.TurnUpdateH\x00\x42\x06\n\x04\x64\x61ta*7\n\x04Turn\x12\r\n\tTURN_HOST\x10\x00\x12\x0e\n\nTURN_GUEST\x10\x01\x12\x10\n\x0cTURN_PHYSICS\x10\x02\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\ngame.proto\"\x1c\n\x04Vec2\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\":\n\x06\x42ullet\x12\x17\n\x08position\x18\x01 \x01(\x0b\x32\x05.Vec2\x12\x17\n\x08velocity\x18\x02 \x01(\x0b\x32\x05.Vec2\"p\n\x06Player\x12\x17\n\x08position\x18\x01 \x01(\x0b\x32\x05.Vec2\x12\x17\n\x08velocity\x18\x02 \x01(\x0b\x32\x05.Vec2\x12\x11\n\taim_angle\x18\x03 \x01(\x02\x12\x0e\n\x06health\x18\x04 \x01(\r\x12\x11\n\ttime_left\x18\x05 \x01(\r\"{\n\rDynamicUpdate\x12\x1c\n\x0bhost_player\x18\x01 \x01(\x0b\x32\x07.Player\x12\x1d\n\x0cguest_player\x18\x02 \x01(\x0b\x32\x07.Player\x12\x18\n\x07\x62ullets\x18\x03 \x03(\x0b\x32\x07.Bullet\x12\x13\n\x04turn\x18\x04 \x01(\x0e\x32\x05.Turn\"3\n\nTurnUpdate\x12\x10\n\x08\x62it_mask\x18\x01 \x01(\x0c\x12\x13\n\x04turn\x18\x02 \x01(\x0e\x32\x05.Turn\"t\n\nGameUpdate\x12\x10\n\x08match_id\x18\x01 \x01(\t\x12(\n\x0e\x64ynamic_update\x18\x02 \x01(\x0b\x32\x0e.DynamicUpdateH\x00\x12\"\n\x0bturn_update\x18\x03 \x01(\x0b\x32\x0b.TurnUpdateH\x00\x42\x06\n\x04\x64\x61ta*%\n\x04Turn\x12\r\n\tTURN_HOST\x10\x00\x12\x0e\n\nTURN_GUEST\x10\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'game_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_TURN']._serialized_start=541
-  _globals['_TURN']._serialized_end=596
+  _globals['_TURN']._serialized_start=514
+  _globals['_TURN']._serialized_end=551
   _globals['_VEC2']._serialized_start=14
   _globals['_VEC2']._serialized_end=42
   _globals['_BULLET']._serialized_start=44
   _globals['_BULLET']._serialized_end=102
   _globals['_PLAYER']._serialized_start=104
   _globals['_PLAYER']._serialized_end=216
-  _globals['_DYNAMICUPDATE']._serialized_start=219
-  _globals['_DYNAMICUPDATE']._serialized_end=368
-  _globals['_TURNUPDATE']._serialized_start=370
-  _globals['_TURNUPDATE']._serialized_end=421
-  _globals['_GAMEUPDATE']._serialized_start=423
-  _globals['_GAMEUPDATE']._serialized_end=539
+  _globals['_DYNAMICUPDATE']._serialized_start=218
+  _globals['_DYNAMICUPDATE']._serialized_end=341
+  _globals['_TURNUPDATE']._serialized_start=343
+  _globals['_TURNUPDATE']._serialized_end=394
+  _globals['_GAMEUPDATE']._serialized_start=396
+  _globals['_GAMEUPDATE']._serialized_end=512
 # @@protoc_insertion_point(module_scope)

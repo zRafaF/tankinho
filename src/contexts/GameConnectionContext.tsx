@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import {
   ClientMessageSchema,
@@ -11,6 +12,11 @@ import {
   ServerMessageSchema,
   ServerMessage_ServerFlags,
 } from "@/gen/proto/connection_pb";
+import {
+  Turn,
+  GameUpdateSchema,
+  type DynamicUpdate,
+} from "@/gen/proto/game_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
@@ -26,6 +32,12 @@ interface GameConnectionContextValue {
   disconnectFromMatch: () => void;
   isConnected: boolean;
   isConnecting: boolean;
+
+  latestOpponentState: DynamicUpdate | null;
+  setLatestOpponentState: (update: DynamicUpdate) => void;
+  sendDynamicUpdate: (update: DynamicUpdate) => void;
+  currentTurn: Turn;
+  setCurrentTurn: (t: Turn) => void;
 }
 
 const GameConnectionContext = createContext<
@@ -42,32 +54,35 @@ export const useGameConnectionContext = () => {
   return context;
 };
 
-interface GameConnectionProviderProps {
-  children: React.ReactNode;
-  onCreateHost: (matchId: string) => void;
-  onJoinGuest: (matchId: string) => void;
-  onStartMatch?: () => void;
-  onOtherPlayerDisconnected?: () => void;
-}
-
 export const GameConnectionProvider = ({
   children,
   onCreateHost,
   onJoinGuest,
   onStartMatch,
   onOtherPlayerDisconnected,
-}: GameConnectionProviderProps) => {
+}: {
+  children: React.ReactNode;
+  onCreateHost: (matchId: string) => void;
+  onJoinGuest: (matchId: string) => void;
+  onStartMatch?: () => void;
+  onOtherPlayerDisconnected?: () => void;
+}) => {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("connecting");
   const [roomCode, setRoomCode] = useState("");
   const [error, setError] = useState("");
-  const [socket, setSocket] = useState<WebSocket | null>(null);
   const [playerId, setPlayerId] = useState<number | null>(null);
   const [isHost, setIsHost] = useState(false);
+  const [latestOpponentState, setLatestOpponentState] =
+    useState<DynamicUpdate | null>(null);
+  const [currentTurn, setCurrentTurn] = useState<Turn>(Turn.HOST);
+
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     const ws = new WebSocket(import.meta.env.VITE_WS_SERVER);
     ws.binaryType = "arraybuffer";
+    socketRef.current = ws;
 
     ws.onopen = () => {
       setConnectionState("connected");
@@ -92,42 +107,33 @@ export const GameConnectionProvider = ({
         switch (serverMessage.message.case) {
           case "error":
             setError(serverMessage.message.value.message);
-
-            switch (serverMessage.message.value.type) {
-              case Error_Type.ERROR_HOST_DISCONNECTED:
-              case Error_Type.ERROR_GUEST_DISCONNECTED:
-                console.log("Player disconnected");
-
-                onOtherPlayerDisconnected?.();
-                break;
-
-              default:
-                break;
+            if (
+              serverMessage.message.value.type ===
+                Error_Type.ERROR_HOST_DISCONNECTED ||
+              serverMessage.message.value.type ===
+                Error_Type.ERROR_GUEST_DISCONNECTED
+            ) {
+              onOtherPlayerDisconnected?.();
             }
-
             break;
 
           case "success":
             setError("");
             break;
 
-          case "matchCreated": {
-            const matchData = serverMessage.message.value;
-            setRoomCode(matchData.matchId);
-            setPlayerId(matchData.playerId);
+          case "matchCreated":
+            setRoomCode(serverMessage.message.value.matchId);
+            setPlayerId(serverMessage.message.value.playerId);
             setIsHost(true);
-            onCreateHost(matchData.matchId);
+            onCreateHost(serverMessage.message.value.matchId);
             break;
-          }
 
-          case "matchJoined": {
-            const matchData = serverMessage.message.value;
-            setRoomCode(matchData.matchId);
-            setPlayerId(matchData.playerId);
+          case "matchJoined":
+            setRoomCode(serverMessage.message.value.matchId);
+            setPlayerId(serverMessage.message.value.playerId);
             setIsHost(false);
-            onJoinGuest(matchData.matchId);
+            onJoinGuest(serverMessage.message.value.matchId);
             break;
-          }
 
           case "serverFlags":
             if (
@@ -137,6 +143,19 @@ export const GameConnectionProvider = ({
               onStartMatch?.();
             }
             break;
+
+          case "gameUpdate": {
+            const gameUpdate = serverMessage.message.value;
+            if (gameUpdate.data.case === "dynamicUpdate") {
+              const dynamic = gameUpdate.data.value;
+              const theirTurn = dynamic.turn;
+              const myTurn = isHost ? Turn.HOST : Turn.GUEST;
+              if (theirTurn !== myTurn) {
+                setLatestOpponentState(dynamic);
+              }
+            }
+            break;
+          }
         }
       } catch (e) {
         console.error("Message parsing error:", e);
@@ -144,11 +163,17 @@ export const GameConnectionProvider = ({
       }
     };
 
-    setSocket(ws);
     return () => ws.close();
-  }, []);
+  }, [
+    isHost,
+    onCreateHost,
+    onJoinGuest,
+    onOtherPlayerDisconnected,
+    onStartMatch,
+  ]);
 
   const createMatch = useCallback(() => {
+    const socket = socketRef.current;
     if (!socket || connectionState !== "connected") return;
     try {
       const message = create(ClientMessageSchema);
@@ -156,13 +181,13 @@ export const GameConnectionProvider = ({
       message.message.value = true;
       socket.send(toBinary(ClientMessageSchema, message));
     } catch (e) {
-      console.error("Create match error:", e);
       setError("Failed to create match");
     }
-  }, [socket, connectionState]);
+  }, [connectionState]);
 
   const joinMatch = useCallback(
     (code: string) => {
+      const socket = socketRef.current;
       if (!socket || connectionState !== "connected") return;
       try {
         const message = create(ClientMessageSchema);
@@ -170,14 +195,14 @@ export const GameConnectionProvider = ({
         message.message.value = code;
         socket.send(toBinary(ClientMessageSchema, message));
       } catch (e) {
-        console.error("Join match error:", e);
         setError("Failed to join match");
       }
     },
-    [socket, connectionState]
+    [connectionState]
   );
 
   const disconnectFromMatch = useCallback(() => {
+    const socket = socketRef.current;
     if (!socket || !roomCode) return;
     try {
       const message = create(ClientMessageSchema);
@@ -185,10 +210,34 @@ export const GameConnectionProvider = ({
       message.message.value = roomCode;
       socket.send(toBinary(ClientMessageSchema, message));
     } catch (e) {
-      console.error("Disconnect error:", e);
-      setError("Failed to disconnect from match");
+      setError("Failed to disconnect");
     }
-  }, [socket, roomCode]);
+  }, [roomCode]);
+
+  const sendDynamicUpdate = useCallback(
+    (update: DynamicUpdate) => {
+      const socket = socketRef.current;
+      if (!socket || connectionState !== "connected" || !roomCode) return;
+      const wrapper = create(GameUpdateSchema, {
+        matchId: roomCode,
+        data: { case: "dynamicUpdate", value: update },
+      });
+
+      const message = create(ClientMessageSchema);
+      message.message.case = "gameUpdate";
+      message.message.value = wrapper;
+
+      if (message.message.value.data.case === "dynamicUpdate") {
+        console.log(
+          "Sending dynamic update:",
+          message.message.value.data.value.hostPlayer
+        );
+      }
+
+      socket.send(toBinary(ClientMessageSchema, message));
+    },
+    [roomCode, connectionState]
+  );
 
   const value: GameConnectionContextValue = {
     connectionState,
@@ -201,6 +250,11 @@ export const GameConnectionProvider = ({
     disconnectFromMatch,
     isConnected: connectionState === "connected",
     isConnecting: connectionState === "connecting",
+    latestOpponentState,
+    setLatestOpponentState,
+    sendDynamicUpdate,
+    currentTurn,
+    setCurrentTurn,
   };
 
   return (
