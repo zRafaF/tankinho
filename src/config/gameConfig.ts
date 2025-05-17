@@ -8,10 +8,15 @@ export const PLAYER_GRAVITY = 9.8; // in environment units per second squared
 export const PLAYER_MAX_STEP_OVER = 2; // max blocks player can step over
 export const INITIAL_PLAYER_POS = { x: 20, y: 1 }; // in environment units (starting in air)
 export const TERRAIN_CONFIG = {
-  airRows: 5, // number of air rows above terrain
-  amplitude: 3, // height of sine wave
-  frequency: 0.1, // how many waves across the width
+  airRows: 5,
+  amplitude: 15,
+  frequency: 0.1,
 };
 
-export const SHOOTING_POWER_BARS = 20; // number of discrete bars
-export const SHOOTING_LOAD_TIME_MS = 1000; // time to fill all bars
+// ——— Shooting settings ———
+export const SHOOTING_POWER_BARS = 20;
+export const SHOOTING_POWER_INTERVAL_MS = 200; // how often (ms) a bar fills
+
+// ——— Turn settings ———
+export const TURN_TIME_SEC = 20; // seconds per turn
+export const TURN_DELAY_MS = 5000; // downtime between turns

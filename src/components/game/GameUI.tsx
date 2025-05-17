@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Copy, CheckCircle, Zap } from "lucide-react";
+import { ArrowLeft, Copy, CheckCircle, Zap, Clock } from "lucide-react";
 import { SHOOTING_POWER_BARS } from "@/config/gameConfig";
 
 interface GameUIProps {
@@ -9,6 +9,8 @@ interface GameUIProps {
   onExit: () => void;
   powerBars: number;
   isCharging: boolean;
+  turnTime: number;
+  isTurnActive: boolean;
 }
 
 export function GameUI({
@@ -18,10 +20,11 @@ export function GameUI({
   onExit,
   powerBars,
   isCharging,
+  turnTime,
+  isTurnActive,
 }: GameUIProps) {
-  // color from green → red
   const barColor = (i: number) => {
-    if (i >= powerBars) return "#444";
+    if (!isTurnActive || i >= powerBars) return "#444";
     const t = i / (SHOOTING_POWER_BARS - 1);
     const hue = 120 * (1 - t);
     return `hsl(${hue},100%,50%)`;
@@ -50,9 +53,13 @@ export function GameUI({
         </button>
       </div>
 
-      {/* Discrete power bars */}
+      {/* Shooting Power Bars */}
       <div className="flex items-center gap-1 bg-black/50 px-2 py-1 rounded-lg border border-yellow-500/30">
-        <Zap className="h-4 w-4 text-yellow-400" />
+        <Zap
+          className={`h-4 w-4 ${
+            isTurnActive ? "text-yellow-400" : "text-gray-600"
+          }`}
+        />
         <div className="flex space-x-0.5">
           {Array.from({ length: SHOOTING_POWER_BARS }).map((_, i) => (
             <div
@@ -62,6 +69,14 @@ export function GameUI({
             />
           ))}
         </div>
+      </div>
+
+      {/* Turn Timer */}
+      <div className="flex items-center gap-1 bg-black/50 px-2 py-1 rounded-lg border border-blue-500/30">
+        <Clock className="h-4 w-4 text-blue-300" />
+        <span className="text-white font-mono">
+          {isTurnActive ? `${turnTime}s` : "Waiting..."}
+        </span>
       </div>
     </div>
   );

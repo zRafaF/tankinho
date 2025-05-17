@@ -6,6 +6,9 @@ import {
   ENVIRONMENT_HEIGHT,
   INITIAL_PLAYER_POS,
   SHOOTING_POWER_BARS,
+  SHOOTING_POWER_INTERVAL_MS,
+  TURN_TIME_SEC,
+  TURN_DELAY_MS,
 } from "@/config/gameConfig";
 import { createTerrain } from "@/lib/environmentUtils";
 import { Environment } from "@/components/game/Environment";
@@ -18,9 +21,13 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
   const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
   const [turretAngle, setTurretAngle] = useState(0);
 
-  // —— Charging state ——
+  // — Shooting state —
   const [isCharging, setIsCharging] = useState(false);
   const [powerBars, setPowerBars] = useState(1);
+
+  // — Turn state —
+  const [turnTime, setTurnTime] = useState(TURN_TIME_SEC);
+  const [isTurnActive, setIsTurnActive] = useState(false);
 
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -30,7 +37,40 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
   const [environmentBitmask] = useState<Uint8Array>(createTerrain);
   const stageRef = useRef<any>(null);
 
-  // Resize
+  // — Start the first turn on mount —
+  useEffect(() => {
+    const startTurn = () => {
+      console.log("➡️ New turn started");
+      setIsTurnActive(true);
+      setTurnTime(TURN_TIME_SEC);
+    };
+    startTurn();
+  }, []);
+
+  // — Handle the countdown while turn is active —
+  useEffect(() => {
+    if (!isTurnActive) return;
+    const timer = window.setInterval(() => {
+      setTurnTime((t) => {
+        if (t <= 1) {
+          clearInterval(timer);
+          console.log("⏹ End of turn");
+          setIsTurnActive(false);
+          // after delay, start next turn
+          setTimeout(() => {
+            console.log("🔁 Preparing next turn...");
+            setIsTurnActive(true);
+            setTurnTime(TURN_TIME_SEC);
+          }, TURN_DELAY_MS);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isTurnActive]);
+
+  // — Handle resize —
   useEffect(() => {
     const onResize = () =>
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -41,9 +81,10 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
   const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
   const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
 
-  // Global mouse → turret
+  // — Global mouse → turret (only on-turn) —
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      if (!isTurnActive) return;
       if (!stageRef.current) return;
       const rect = stageRef.current.container().getBoundingClientRect();
       const mx = e.clientX - rect.left;
@@ -54,18 +95,18 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     };
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [blockSize, playerPos]);
+  }, [blockSize, playerPos, isTurnActive]);
 
-  // Start/stop charging on Space
+  // — Start/stop charging on Space (only on-turn) —
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !isCharging) {
+      if (e.code === "Space" && !isCharging && isTurnActive) {
         setIsCharging(true);
         setPowerBars(1);
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space" && isCharging) {
+      if (e.code === "Space" && isCharging && isTurnActive) {
         setIsCharging(false);
         console.log(
           `🔫 Shot fired with power bars: ${powerBars}/${SHOOTING_POWER_BARS}`
@@ -79,16 +120,16 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [isCharging, powerBars]);
+  }, [isCharging, powerBars, isTurnActive]);
 
-  // Increment a bar every 200 ms while charging
+  // — Increment a bar every INTERVAL ms while charging —
   useEffect(() => {
-    if (!isCharging) return;
+    if (!isCharging || !isTurnActive) return;
     const id = window.setInterval(() => {
       setPowerBars((bars) => Math.min(bars + 1, SHOOTING_POWER_BARS));
-    }, 200);
+    }, SHOOTING_POWER_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [isCharging]);
+  }, [isCharging, isTurnActive]);
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -117,6 +158,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
             bitmask={environmentBitmask}
             blockSize={blockSize}
             turretAngle={turretAngle}
+            isTurnActive={isTurnActive}
             onPositionChange={setPlayerPos}
           />
         </Layer>
@@ -129,6 +171,8 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
         onExit={handleExit}
         powerBars={powerBars}
         isCharging={isCharging}
+        turnTime={turnTime}
+        isTurnActive={isTurnActive}
       />
     </div>
   );

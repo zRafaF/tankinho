@@ -17,7 +17,8 @@ interface PlayerProps {
   health: number;
   bitmask: Uint8Array;
   blockSize: number;
-  turretAngle: number; // in radians
+  turretAngle: number;
+  isTurnActive: boolean;
   onPositionChange: (pos: { x: number; y: number }) => void;
 }
 
@@ -28,6 +29,7 @@ function PlayerInner({
   bitmask,
   blockSize,
   turretAngle,
+  isTurnActive,
   onPositionChange,
 }: PlayerProps) {
   const posRef = useRef({ x, y });
@@ -36,10 +38,12 @@ function PlayerInner({
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (!isTurnActive) return;
       if (e.key === "a") setMovingLeft(true);
       if (e.key === "d") setMovingRight(true);
     };
     const up = (e: KeyboardEvent) => {
+      if (!isTurnActive) return;
       if (e.key === "a") setMovingLeft(false);
       if (e.key === "d") setMovingRight(false);
     };
@@ -49,14 +53,17 @@ function PlayerInner({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [isTurnActive]);
 
-  // Movement, step-over, and snap to ground
   useEffect(() => {
     let rafId: number;
     let lastTime = performance.now();
 
     const loop = (time: number) => {
+      if (!isTurnActive) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
       const dt = (time - lastTime) / 1000;
       lastTime = time;
 
@@ -71,6 +78,7 @@ function PlayerInner({
         Math.min(newX, ENVIRONMENT_WIDTH - PLAYER_WIDTH / 2)
       );
 
+      // — side collision & step-over —
       const halfW = PLAYER_WIDTH / 2;
       const dir = vx > 0 ? 1 : vx < 0 ? -1 : 0;
       if (dir !== 0) {
@@ -81,21 +89,22 @@ function PlayerInner({
         const footRow = Math.floor(oldY + PLAYER_HEIGHT / 2);
 
         if (getEnvironmentBit(bitmask, aheadCol, footRow)) {
-          let wallHeight = 1;
+          let wallH = 1;
           while (
-            wallHeight <= PLAYER_MAX_STEP_OVER &&
-            getEnvironmentBit(bitmask, aheadCol, footRow - wallHeight)
+            wallH <= PLAYER_MAX_STEP_OVER &&
+            getEnvironmentBit(bitmask, aheadCol, footRow - wallH)
           ) {
-            wallHeight++;
+            wallH++;
           }
-          if (wallHeight <= PLAYER_MAX_STEP_OVER) {
-            oldY -= wallHeight;
+          if (wallH <= PLAYER_MAX_STEP_OVER) {
+            oldY -= wallH;
           } else {
             newX = dir > 0 ? aheadCol - halfW : aheadCol + 1 + halfW;
           }
         }
       }
 
+      // — snap to ground —
       const colStart = Math.floor(newX - halfW);
       const colEnd = Math.floor(newX + halfW - 0.001);
       let groundRow = ENVIRONMENT_HEIGHT;
@@ -112,10 +121,9 @@ function PlayerInner({
           break;
         }
       }
-
       const newY = groundRow - PLAYER_HEIGHT / 2;
-      const newPos = { x: newX, y: newY };
 
+      const newPos = { x: newX, y: newY };
       if (newPos.x !== posRef.current.x || newPos.y !== posRef.current.y) {
         posRef.current = newPos;
         onPositionChange(newPos);
@@ -126,13 +134,13 @@ function PlayerInner({
 
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [movingLeft, movingRight, bitmask, onPositionChange]);
+  }, [movingLeft, movingRight, bitmask, isTurnActive, onPositionChange]);
 
-  // === Render ===
+  // — render —
   const pw = PLAYER_WIDTH * blockSize;
   const ph = PLAYER_HEIGHT * blockSize;
-  const turretLength = 2 * blockSize;
-  const turretWidth = 0.3 * blockSize;
+  const turretLen = 2 * blockSize;
+  const turretW = 0.3 * blockSize;
 
   return (
     <Group x={x * blockSize} y={y * blockSize}>
@@ -140,9 +148,9 @@ function PlayerInner({
       <Group rotation={(turretAngle * 180) / Math.PI}>
         <Rect
           x={0}
-          y={-turretWidth / 2}
-          width={turretLength}
-          height={turretWidth}
+          y={-turretW / 2}
+          width={turretLen}
+          height={turretW}
           fill="#333"
           cornerRadius={blockSize * 0.05}
         />
@@ -176,7 +184,7 @@ function PlayerInner({
         />
       </Group>
 
-      {/* Player Body */}
+      {/* Body */}
       <Rect
         x={-pw / 2}
         y={-ph / 2}
@@ -198,5 +206,6 @@ export const Player = React.memo(
     prev.blockSize === next.blockSize &&
     prev.bitmask === next.bitmask &&
     prev.turretAngle === next.turretAngle &&
+    prev.isTurnActive === next.isTurnActive &&
     prev.onPositionChange === next.onPositionChange
 );
