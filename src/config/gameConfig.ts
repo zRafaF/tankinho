@@ -22,3 +22,6 @@ export const TURN_DELAY_MS = 1000; // downtime between turns
 
 export const BULLET_GRAVITY = 9.8; // environment units/sec²
 export const BULLET_SPEED_FACTOR = 40; // scales powerBars → initial speed
+
+export const EXPLOSION_RADIUS = 2; // in blocks
+export const EXPLOSION_DAMAGE = 17; // health points

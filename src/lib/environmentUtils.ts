@@ -91,3 +91,11 @@ export function canStepOver(
   }
   return { canStep: false };
 }
+
+export function clearEnvironmentBit(bitmask: Uint8Array, x: number, y: number) {
+  if (x < 0 || x >= ENVIRONMENT_WIDTH || y < 0 || y >= ENVIRONMENT_HEIGHT)
+    return;
+  const byteIndex = y * BYTES_PER_ROW + Math.floor(x / 8);
+  const bitPosition = 7 - (x % 8);
+  bitmask[byteIndex] &= ~(1 << bitPosition);
+}
