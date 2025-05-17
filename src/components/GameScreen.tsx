@@ -12,11 +12,12 @@ import {
   BULLET_GRAVITY,
   BULLET_SPEED_FACTOR,
 } from "@/config/gameConfig";
-import { createTerrain } from "@/lib/environmentUtils";
-import { getEnvironmentBit } from "@/lib/environmentUtils";
+import { createTerrain, getEnvironmentBit } from "@/lib/environmentUtils";
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
 import { GameUI } from "@/components/game/GameUI";
+
+type RoundState = "player" | "bullet" | "other";
 
 interface Bullet {
   id: number;
@@ -27,14 +28,13 @@ interface Bullet {
 }
 
 export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
-  // --- Game & turn state ---
-  const [health] = useState(100);
+  // --- Core state ---
   const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
   const [turretAngle, setTurretAngle] = useState(0);
+  const [roundState, setRoundState] = useState<RoundState>("player");
   const [turnTime, setTurnTime] = useState(TURN_TIME_SEC);
-  const [isTurnActive, setIsTurnActive] = useState(false);
 
-  // --- Shooting power state ---
+  // --- Charging & power ---
   const [isCharging, setIsCharging] = useState(false);
   const [powerBars, setPowerBars] = useState(1);
 
@@ -42,178 +42,175 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const nextBulletId = useRef(1);
 
-  // --- Boilerplate UI state ---
-  const [copied, setCopied] = useState(false);
+  // --- UI boilerplate ---
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight,
   });
   const { roomCode, disconnectFromMatch } = useGameConnectionContext();
-  const [environmentBitmask] = useState<Uint8Array>(createTerrain);
+  const [bitmask] = useState<Uint8Array>(createTerrain);
   const stageRef = useRef<any>(null);
-
-  // — Resize handler —
-  useEffect(() => {
-    const onResize = () =>
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
   const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
 
-  // — Start first turn —
+  // — Resize handler —
   useEffect(() => {
-    console.log("➡️ New turn started");
-    setIsTurnActive(true);
-    setTurnTime(TURN_TIME_SEC);
+    const onResize = () =>
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // — Turn countdown & cycle —
+  // — 1) Player-turn countdown —
   useEffect(() => {
-    if (!isTurnActive) return;
-    const timer = window.setInterval(() => {
+    if (roundState !== "player") return;
+    setTurnTime(TURN_TIME_SEC);
+    const id = window.setInterval(() => {
       setTurnTime((t) => {
         if (t <= 1) {
-          clearInterval(timer);
-          console.log("⏹ End of turn");
-          setIsTurnActive(false);
-          // schedule next turn
-          setTimeout(() => {
-            console.log("🔁 Preparing next turn...");
-            setIsTurnActive(true);
-            setTurnTime(TURN_TIME_SEC);
-          }, TURN_DELAY_MS);
+          clearInterval(id);
+          console.log("🔚 Player time up → handOverTurn()");
+          setRoundState("other");
           return 0;
         }
         return t - 1;
       });
     }, 1000);
-    return () => clearInterval(timer);
-  }, [isTurnActive]);
+    return () => clearInterval(id);
+  }, [roundState]);
 
-  // — Global mouse → turret angle (only on-turn) —
+  // — 2) Other-player “downtime” —
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isTurnActive) return;
+    if (roundState !== "other") return;
+    const id = window.setTimeout(() => {
+      console.log("🔁 Back to player turn");
+      setRoundState("player");
+    }, TURN_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [roundState]);
+
+  // — Mouse→turret (only in player phase) —
+  useEffect(() => {
+    if (roundState !== "player") return;
+    const onMove = (e: MouseEvent) => {
       if (!stageRef.current) return;
       const rect = stageRef.current.container().getBoundingClientRect();
-      const mx = e.clientX - rect.left,
-        my = e.clientY - rect.top;
-      const worldX = mx / blockSize,
-        worldY = my / blockSize;
-      setTurretAngle(Math.atan2(worldY - playerPos.y, worldX - playerPos.x));
+      const wx = (e.clientX - rect.left) / blockSize;
+      const wy = (e.clientY - rect.top) / blockSize;
+      setTurretAngle(Math.atan2(wy - playerPos.y, wx - playerPos.x));
     };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [blockSize, playerPos, isTurnActive]);
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, [roundState, playerPos, blockSize]);
 
-  // — Space: charge & shoot bullet (only on-turn) —
+  // — Space: charge / shoot (only in player phase) —
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !isCharging && isTurnActive) {
+    const onDown = (e: KeyboardEvent) => {
+      if (roundState !== "player") return;
+      if (e.code === "Space" && !isCharging) {
         setIsCharging(true);
         setPowerBars(1);
       }
     };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space" && isCharging && isTurnActive) {
+    const onUp = (e: KeyboardEvent) => {
+      if (roundState !== "player") return;
+      if (e.code === "Space" && isCharging) {
         setIsCharging(false);
-        // compute initial bullet velocity
-        const powerFraction = powerBars / SHOOTING_POWER_BARS;
-        const speed = powerFraction * BULLET_SPEED_FACTOR;
+        const frac = powerBars / SHOOTING_POWER_BARS;
+        const speed = frac * BULLET_SPEED_FACTOR;
         const vx = Math.cos(turretAngle) * speed;
         const vy = Math.sin(turretAngle) * speed;
-
-        // spawn bullet at player center
         const id = nextBulletId.current++;
-        setBullets((b) => [
-          ...b,
-          { id, x: playerPos.x, y: playerPos.y, vx, vy },
+        setBullets((bs) => [
+          ...bs,
+          {
+            id,
+            x: playerPos.x,
+            y: playerPos.y,
+            vx,
+            vy,
+          },
         ]);
-
-        console.log(
-          `🔫 Shot fired with power bars: ${powerBars}/${SHOOTING_POWER_BARS}`
-        );
-        console.log(
-          `   → Bullet ${id} spawned, vx=${vx.toFixed(2)}, vy=${vy.toFixed(2)}`
-        );
-
-        // end turn immediately
-        setIsTurnActive(false);
+        console.log(`🔫 Shot! power ${powerBars}/${SHOOTING_POWER_BARS}`);
+        setRoundState("bullet");
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
     };
-  }, [isCharging, powerBars, isTurnActive, playerPos, turretAngle]);
+  }, [roundState, isCharging, powerBars, turretAngle, playerPos]);
 
-  // — Charge bars every INTERVAL ms while holding Space —
+  // — Charging bars every interval —
   useEffect(() => {
-    if (!isCharging || !isTurnActive) return;
+    if (roundState !== "player" || !isCharging) return;
     const id = window.setInterval(() => {
-      setPowerBars((bars) => Math.min(bars + 1, SHOOTING_POWER_BARS));
+      setPowerBars((b) => Math.min(b + 1, SHOOTING_POWER_BARS));
     }, SHOOTING_POWER_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [isCharging, isTurnActive]);
+  }, [roundState, isCharging]);
 
-  // — Bullet physics loop —
+  // — Bullet physics & collision (only in bullet phase) —
   useEffect(() => {
-    let rafId: number;
-    let last = performance.now();
-
+    if (roundState !== "bullet") return;
+    let raf = 0,
+      last = performance.now();
     const step = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
-
       setBullets((list) =>
         list
           .map((b) => {
-            // apply velocity + gravity
-            const nvx = b.vx;
             const nvy = b.vy + BULLET_GRAVITY * dt;
-            const nx = b.x + nvx * dt;
-            const ny = b.y + nvy * dt;
-            return { ...b, x: nx, y: ny, vx: nvx, vy: nvy };
+            return {
+              ...b,
+              x: b.x + b.vx * dt,
+              y: b.y + nvy * dt,
+              vy: nvy,
+            };
           })
           .filter((b) => {
-            // out of bounds?
+            // out of bounds
             if (
               b.x < 0 ||
               b.x > ENVIRONMENT_WIDTH ||
+              b.y < 0 ||
               b.y > ENVIRONMENT_HEIGHT
             ) {
-              console.log(`💥 Bullet ${b.id} boom (out of bounds)`);
+              console.log(`💥 Bullet ${b.id} out of bounds → boom`);
               return false;
             }
-            // hit ground?
-            const tileX = Math.floor(b.x);
-            const tileY = Math.floor(b.y);
-            if (getEnvironmentBit(environmentBitmask, tileX, tileY)) {
-              console.log(`💥 Bullet ${b.id} boom (hit ground)`);
+            // terrain hit
+            const tx = Math.floor(b.x),
+              ty = Math.floor(b.y);
+            if (getEnvironmentBit(bitmask, tx, ty)) {
+              console.log(`💥 Bullet ${b.id} hit terrain → boom`);
               return false;
             }
             return true;
           })
       );
-
-      rafId = requestAnimationFrame(step);
+      raf = requestAnimationFrame(step);
     };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [roundState, bitmask]);
 
-    rafId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafId);
-  }, [environmentBitmask]);
+  // — End bullet phase when no bullets left —
+  useEffect(() => {
+    if (roundState === "bullet" && bullets.length === 0) {
+      console.log("🛑 Bullet phase over → handOverTurn()");
+      setRoundState("other");
+    }
+  }, [roundState, bullets.length]);
 
-  // — Copy room code & exit handlers —
-  const copyRoomCode = () => {
-    navigator.clipboard.writeText(roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  // — Exit handler —
   const handleExit = () => {
     disconnectFromMatch();
     onExitGame();
@@ -225,23 +222,20 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
         ref={stageRef}
         width={windowSize.width}
         height={stageHeight}
-        className="absolute top-1/2 left-0 transform -translate-y-1/2 border-y"
+        className="absolute top-1/2 left-0 transform -translate-y-1/2"
       >
-        <Environment bitmask={environmentBitmask} blockSize={blockSize} />
+        <Environment bitmask={bitmask} blockSize={blockSize} />
         <Layer>
-          {/* Player */}
           <Player
             x={playerPos.x}
             y={playerPos.y}
-            health={health}
-            bitmask={environmentBitmask}
+            health={100}
+            bitmask={bitmask}
             blockSize={blockSize}
             turretAngle={turretAngle}
-            isTurnActive={isTurnActive}
+            isTurnActive={roundState === "player"}
             onPositionChange={setPlayerPos}
           />
-
-          {/* Bullets */}
           {bullets.map((b) => (
             <Circle
               key={b.id}
@@ -254,17 +248,13 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
         </Layer>
       </Stage>
 
-      {/* {console.log("PlayerPos:", playerPos, "Bullets:", bullets)} */}
-
       <GameUI
         roomCode={roomCode}
-        copied={copied}
-        onCopy={copyRoomCode}
         onExit={handleExit}
+        roundState={roundState}
+        turnTime={turnTime}
         powerBars={powerBars}
         isCharging={isCharging}
-        turnTime={turnTime}
-        isTurnActive={isTurnActive}
       />
     </div>
   );

@@ -12,7 +12,6 @@ export const TERRAIN_CONFIG = {
   amplitude: 3,
   frequency: 0.1,
 };
-
 // ——— Shooting settings ———
 export const SHOOTING_POWER_BARS = 30;
 export const SHOOTING_POWER_INTERVAL_MS = 50; // how often (ms) a bar fills
