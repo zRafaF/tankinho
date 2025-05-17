@@ -9,14 +9,17 @@ export const PLAYER_MAX_STEP_OVER = 2; // max blocks player can step over
 export const INITIAL_PLAYER_POS = { x: 20, y: 1 }; // in environment units (starting in air)
 export const TERRAIN_CONFIG = {
   airRows: 5,
-  amplitude: 15,
+  amplitude: 3,
   frequency: 0.1,
 };
 
 // ——— Shooting settings ———
 export const SHOOTING_POWER_BARS = 20;
-export const SHOOTING_POWER_INTERVAL_MS = 200; // how often (ms) a bar fills
+export const SHOOTING_POWER_INTERVAL_MS = 100; // how often (ms) a bar fills
 
 // ——— Turn settings ———
 export const TURN_TIME_SEC = 20; // seconds per turn
-export const TURN_DELAY_MS = 5000; // downtime between turns
+export const TURN_DELAY_MS = 1000; // downtime between turns
+
+export const BULLET_GRAVITY = 9.8; // environment units/sec²
+export const BULLET_SPEED_FACTOR = 50; // scales powerBars → initial speed
