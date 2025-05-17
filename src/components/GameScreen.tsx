@@ -225,7 +225,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
         ref={stageRef}
         width={windowSize.width}
         height={stageHeight}
-        className="absolute top-1/2 left-0 transform -translate-y-1/2"
+        className="absolute top-1/2 left-0 transform -translate-y-1/2 border-y"
       >
         <Environment bitmask={environmentBitmask} blockSize={blockSize} />
         <Layer>

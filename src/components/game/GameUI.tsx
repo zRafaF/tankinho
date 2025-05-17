@@ -26,12 +26,12 @@ export function GameUI({
   const barColor = (i: number) => {
     if (!isTurnActive || i >= powerBars) return "#444";
     const t = i / (SHOOTING_POWER_BARS - 1);
-    const hue = 120 * (1 - t);
-    return `hsl(${hue},100%,50%)`;
+    return `hsl(${120 * (1 - t)},100%,50%)`;
   };
 
   return (
     <div className="absolute top-4 left-4 flex items-center gap-4">
+      {/* Exit & room code */}
       <Button
         onClick={onExit}
         variant="outline"
@@ -41,7 +41,6 @@ export function GameUI({
         <ArrowLeft className="h-4 w-4 mr-2" />
         Exit
       </Button>
-
       <div className="flex items-center gap-2 bg-black/50 px-3 py-1 rounded-lg border border-purple-500/30">
         <span className="font-mono font-bold">{roomCode}</span>
         <button onClick={onCopy} className="text-gray-300 hover:text-white">
@@ -53,7 +52,7 @@ export function GameUI({
         </button>
       </div>
 
-      {/* Shooting Power Bars */}
+      {/* Power bars */}
       <div className="flex items-center gap-1 bg-black/50 px-2 py-1 rounded-lg border border-yellow-500/30">
         <Zap
           className={`h-4 w-4 ${
@@ -71,12 +70,22 @@ export function GameUI({
         </div>
       </div>
 
-      {/* Turn Timer */}
+      {/* Turn timer */}
       <div className="flex items-center gap-1 bg-black/50 px-2 py-1 rounded-lg border border-blue-500/30">
         <Clock className="h-4 w-4 text-blue-300" />
         <span className="text-white font-mono">
           {isTurnActive ? `${turnTime}s` : "Waiting..."}
         </span>
+      </div>
+
+      {/* Controls legend with icons */}
+      <div className="flex items-center gap-2 bg-black/50 px-2 py-1 rounded-lg border border-gray-600">
+        <kbd className="px-1 bg-gray-800 text-white rounded">A</kbd>
+        <span className="text-gray-300">Move Left</span>
+        <kbd className="px-1 bg-gray-800 text-white rounded">D</kbd>
+        <span className="text-gray-300">Move Right</span>
+        <kbd className="px-3 bg-gray-800 text-white rounded">␣</kbd>
+        <span className="text-gray-300">Charge & Shoot</span>
       </div>
     </div>
   );
