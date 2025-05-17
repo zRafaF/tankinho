@@ -14,8 +14,11 @@ import {
   EXPLOSION_RADIUS,
   EXPLOSION_DAMAGE,
 } from "@/config/gameConfig";
-import { createTerrain, getEnvironmentBit } from "@/lib/environmentUtils";
-import { clearEnvironmentBit } from "@/lib/environmentUtils";
+import {
+  createTerrain,
+  getEnvironmentBit,
+  clearEnvironmentBit,
+} from "@/lib/environmentUtils";
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
 import { GameUI } from "@/components/game/GameUI";
@@ -34,29 +37,29 @@ interface Explosion {
   y: number;
 }
 
+type RoundState = "player" | "bullet" | "other";
+
 export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
-  // --- State ---
+  // --- Core State ---
   const [health, setHealth] = useState(100);
   const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
   const [turretAngle, setTurretAngle] = useState(0);
-  const [roundState, setRoundState] = useState<"player" | "bullet" | "other">(
-    "player"
-  );
+  const [roundState, setRoundState] = useState<RoundState>("player");
   const [turnTime, setTurnTime] = useState(TURN_TIME_SEC);
 
   const [isCharging, setIsCharging] = useState(false);
   const [powerBars, setPowerBars] = useState(1);
 
-  const [bullets, setBullets] = useState<Bullet[]>([]);
-  const nextBulletId = useRef(1);
-
-  const [explosions, setExplosions] = useState<Explosion[]>([]);
-  const nextExplId = useRef(1);
-
-  // store bitmask in state so we can update it
   const [bitmask, setBitmask] = useState<Uint8Array>(() => createTerrain());
 
-  // UI boilerplate
+  // --- Bullets & Explosions ---
+  const [bullets, setBullets] = useState<Bullet[]>([]);
+  const nextBulletId = useRef(1);
+  const [explosions, setExplosions] = useState<Explosion[]>([]);
+  const nextExplId = useRef(1);
+  const explodedBullets = useRef<Set<number>>(new Set());
+
+  // --- UI Boilerplate ---
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight,
@@ -67,7 +70,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
   const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
   const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
 
-  // resize
+  // — Resize Handler —
   useEffect(() => {
     const onResize = () =>
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -75,7 +78,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // player phase countdown
+  // — Player Turn Countdown —
   useEffect(() => {
     if (roundState !== "player") return;
     setTurnTime(TURN_TIME_SEC);
@@ -93,7 +96,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => clearInterval(id);
   }, [roundState]);
 
-  // other-player downtime
+  // — Other Player Downtime —
   useEffect(() => {
     if (roundState !== "other") return;
     const id = window.setTimeout(() => {
@@ -103,7 +106,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => clearTimeout(id);
   }, [roundState]);
 
-  // mouse → turret
+  // — Mouse to Turret (Player Phase) —
   useEffect(() => {
     if (roundState !== "player") return;
     const onMove = (e: MouseEvent) => {
@@ -117,7 +120,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => window.removeEventListener("mousemove", onMove);
   }, [roundState, playerPos, blockSize]);
 
-  // charge & shoot
+  // — Charge & Shoot (Player Phase) —
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       if (roundState !== "player") return;
@@ -130,7 +133,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
       if (roundState !== "player") return;
       if (e.code === "Space" && isCharging) {
         setIsCharging(false);
-        // fire bullet
+        // Fire bullet
         const frac = powerBars / SHOOTING_POWER_BARS;
         const speed = frac * BULLET_SPEED_FACTOR;
         const vx = Math.cos(turretAngle) * speed;
@@ -152,7 +155,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     };
   }, [roundState, isCharging, powerBars, turretAngle, playerPos]);
 
-  // charging interval
+  // — Charging Bars Interval —
   useEffect(() => {
     if (roundState !== "player" || !isCharging) return;
     const id = window.setInterval(() => {
@@ -161,11 +164,11 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => clearInterval(id);
   }, [roundState, isCharging]);
 
-  // bullet physics & collision
+  // — Bullet Physics & Collision (Bullet Phase) —
   useEffect(() => {
     if (roundState !== "bullet") return;
-    let raf = 0,
-      last = performance.now();
+    let raf = 0;
+    let last = performance.now();
     const step = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
@@ -176,21 +179,21 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
             return { ...b, x: b.x + b.vx * dt, y: b.y + nvy * dt, vy: nvy };
           })
           .filter((b) => {
-            // OOB
+            // Out of bounds?
             if (
               b.x < 0 ||
               b.x > ENVIRONMENT_WIDTH ||
               b.y < 0 ||
               b.y > ENVIRONMENT_HEIGHT
             ) {
-              console.log(`💥 Bullet ${b.id} OOB`);
+              triggerExplosion(b.id, b.x, b.y);
               return false;
             }
+            // Terrain hit?
             const tx = Math.floor(b.x),
               ty = Math.floor(b.y);
             if (getEnvironmentBit(bitmask, tx, ty)) {
-              // hit: explosion
-              doExplosion(b.x, b.y);
+              triggerExplosion(b.id, b.x, b.y);
               return false;
             }
             return true;
@@ -202,29 +205,29 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => cancelAnimationFrame(raf);
   }, [roundState, bitmask]);
 
-  // end bullet phase
+  // — End Bullet Phase when all bullets gone —
   useEffect(() => {
     if (roundState === "bullet" && bullets.length === 0) {
       console.log("🛑 Bullet over → handOverTurn()");
       setRoundState("other");
     }
-  }, [roundState, bullets]);
+  }, [roundState, bullets.length]);
 
-  // explosion: terrain, damage, visual
-  const doExplosion = (wx: number, wy: number) => {
-    // 1) Visual
+  // — Explosion Handler (once per bullet) —
+  const triggerExplosion = (bid: number, wx: number, wy: number) => {
+    if (explodedBullets.current.has(bid)) return;
+    explodedBullets.current.add(bid);
+
+    // Visual
     const eid = nextExplId.current++;
     setExplosions((es) => [...es, { id: eid, x: wx, y: wy }]);
     setTimeout(() => {
       setExplosions((es) => es.filter((e) => e.id !== eid));
     }, 1000);
 
-    // 2) Tile‐center of explosion
-    const cx = Math.floor(wx);
-    const cy = Math.floor(wy);
-
-    // 3) Destroy terrain in a circle
-    // Work on a *copy* so React re-renders Environment
+    // Terrain destruction
+    const cx = Math.floor(wx),
+      cy = Math.floor(wy);
     const newMask = Uint8Array.from(bitmask);
     for (let dx = -EXPLOSION_RADIUS; dx <= EXPLOSION_RADIUS; dx++) {
       for (let dy = -EXPLOSION_RADIUS; dy <= EXPLOSION_RADIUS; dy++) {
@@ -235,7 +238,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     }
     setBitmask(newMask);
 
-    // 4) Damage player if within radius
+    // Player damage
     const dist2 = (playerPos.x - wx) ** 2 + (playerPos.y - wy) ** 2;
     if (dist2 <= EXPLOSION_RADIUS * EXPLOSION_RADIUS) {
       setHealth((h) => {
@@ -246,6 +249,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     }
   };
 
+  // — Exit Handler —
   const handleExit = () => {
     disconnectFromMatch();
     onExitGame();
