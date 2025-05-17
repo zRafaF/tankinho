@@ -5,6 +5,7 @@ import {
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
   PLAYER_SPEED,
+  PLAYER_MAX_STEP_OVER,
   ENVIRONMENT_WIDTH,
   ENVIRONMENT_HEIGHT,
 } from "@/config/gameConfig";
@@ -16,6 +17,7 @@ interface PlayerProps {
   health: number;
   bitmask: Uint8Array;
   blockSize: number;
+  turretAngle: number; // in radians
   onPositionChange: (pos: { x: number; y: number }) => void;
 }
 
@@ -25,13 +27,13 @@ function PlayerInner({
   health,
   bitmask,
   blockSize,
+  turretAngle,
   onPositionChange,
 }: PlayerProps) {
-  const positionRef = useRef({ x, y });
+  const posRef = useRef({ x, y });
   const [movingLeft, setMovingLeft] = React.useState(false);
   const [movingRight, setMovingRight] = React.useState(false);
 
-  // === Keyboard Input ===
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "a") setMovingLeft(true);
@@ -49,33 +51,56 @@ function PlayerInner({
     };
   }, []);
 
-  // === Movement + Snap to Ground ===
+  // Movement, step-over, and snap to ground
   useEffect(() => {
     let rafId: number;
     let lastTime = performance.now();
 
-    const update = (time: number) => {
+    const loop = (time: number) => {
       const dt = (time - lastTime) / 1000;
       lastTime = time;
 
-      let newX = positionRef.current.x;
-      if (movingLeft) newX -= PLAYER_SPEED * dt;
-      if (movingRight) newX += PLAYER_SPEED * dt;
+      let { x: oldX, y: oldY } = posRef.current;
+      let vx = 0;
+      if (movingLeft) vx -= PLAYER_SPEED;
+      if (movingRight) vx += PLAYER_SPEED;
+      let newX = oldX + vx * dt;
 
-      // Clamp X
       newX = Math.max(
         PLAYER_WIDTH / 2,
         Math.min(newX, ENVIRONMENT_WIDTH - PLAYER_WIDTH / 2)
       );
 
-      // === Snap to ground ===
       const halfW = PLAYER_WIDTH / 2;
+      const dir = vx > 0 ? 1 : vx < 0 ? -1 : 0;
+      if (dir !== 0) {
+        const aheadCol =
+          dir > 0
+            ? Math.floor(newX + halfW - 0.001)
+            : Math.floor(newX - halfW + 0.001);
+        const footRow = Math.floor(oldY + PLAYER_HEIGHT / 2);
+
+        if (getEnvironmentBit(bitmask, aheadCol, footRow)) {
+          let wallHeight = 1;
+          while (
+            wallHeight <= PLAYER_MAX_STEP_OVER &&
+            getEnvironmentBit(bitmask, aheadCol, footRow - wallHeight)
+          ) {
+            wallHeight++;
+          }
+          if (wallHeight <= PLAYER_MAX_STEP_OVER) {
+            oldY -= wallHeight;
+          } else {
+            newX = dir > 0 ? aheadCol - halfW : aheadCol + 1 + halfW;
+          }
+        }
+      }
+
       const colStart = Math.floor(newX - halfW);
       const colEnd = Math.floor(newX + halfW - 0.001);
-
       let groundRow = ENVIRONMENT_HEIGHT;
       for (
-        let row = Math.ceil(y + PLAYER_HEIGHT / 2);
+        let row = Math.ceil(oldY + PLAYER_HEIGHT / 2);
         row < ENVIRONMENT_HEIGHT;
         row++
       ) {
@@ -89,31 +114,40 @@ function PlayerInner({
       }
 
       const newY = groundRow - PLAYER_HEIGHT / 2;
-
       const newPos = { x: newX, y: newY };
-      if (
-        newPos.x !== positionRef.current.x ||
-        newPos.y !== positionRef.current.y
-      ) {
-        positionRef.current = newPos;
+
+      if (newPos.x !== posRef.current.x || newPos.y !== posRef.current.y) {
+        posRef.current = newPos;
         onPositionChange(newPos);
       }
 
-      rafId = requestAnimationFrame(update);
+      rafId = requestAnimationFrame(loop);
     };
 
-    rafId = requestAnimationFrame(update);
+    rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [movingLeft, movingRight, bitmask, y, onPositionChange]);
+  }, [movingLeft, movingRight, bitmask, onPositionChange]);
 
   // === Render ===
-  console.log("Player render");
-
   const pw = PLAYER_WIDTH * blockSize;
   const ph = PLAYER_HEIGHT * blockSize;
+  const turretLength = 2 * blockSize;
+  const turretWidth = 0.3 * blockSize;
 
   return (
     <Group x={x * blockSize} y={y * blockSize}>
+      {/* Turret */}
+      <Group rotation={(turretAngle * 180) / Math.PI}>
+        <Rect
+          x={0}
+          y={-turretWidth / 2}
+          width={turretLength}
+          height={turretWidth}
+          fill="#333"
+          cornerRadius={blockSize * 0.05}
+        />
+      </Group>
+
       {/* Health Bar */}
       <Group y={-ph * 1.2}>
         <Rect
@@ -142,7 +176,7 @@ function PlayerInner({
         />
       </Group>
 
-      {/* Player body */}
+      {/* Player Body */}
       <Rect
         x={-pw / 2}
         y={-ph / 2}
@@ -155,7 +189,6 @@ function PlayerInner({
   );
 }
 
-// Custom memo to avoid re-rendering unless props really changed
 export const Player = React.memo(
   PlayerInner,
   (prev, next) =>
@@ -164,5 +197,6 @@ export const Player = React.memo(
     prev.health === next.health &&
     prev.blockSize === next.blockSize &&
     prev.bitmask === next.bitmask &&
+    prev.turretAngle === next.turretAngle &&
     prev.onPositionChange === next.onPositionChange
 );

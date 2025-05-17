@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Stage, Layer } from "react-konva";
 import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 import {
@@ -19,57 +19,56 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
   const [health] = useState(100);
   const [copied, setCopied] = useState(false);
   const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
+  const [turretAngle, setTurretAngle] = useState(0);
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight,
   });
   const { roomCode, disconnectFromMatch } = useGameConnectionContext();
+  const [environmentBitmask] = useState<Uint8Array>(createTerrain);
+  const stageRef = useRef<any>(null);
 
-  const [environmentBitmask, setEnvironmentBitmask] =
-    useState<Uint8Array>(createTerrain);
-
-  // Full-width responsive scaling
+  // Resize handler
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = () =>
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    };
-
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Calculate responsive scaling
   const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
   const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
+
+  // Track mouse movement to aim turret
+  const handleMouseMove = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+    const worldX = pointer.x / blockSize;
+    const worldY = pointer.y / blockSize;
+    // compute angle from player center to mouse
+    const angle = Math.atan2(worldY - playerPos.y, worldX - playerPos.x);
+    setTurretAngle(angle);
+  };
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
   const handleExit = () => {
     disconnectFromMatch();
     onExitGame();
   };
 
-  // // runs every second
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     // sets a random bitmask to 0
-  //     const random = Math.floor(Math.random() * environmentBitmask.length);
-  //     const newBitmask = new Uint8Array(environmentBitmask);
-  //     newBitmask[random] = 0;
-  //     setEnvironmentBitmask(newBitmask);
-  //   }, 1000);
-  //   return () => clearInterval(interval);
-  // }, []);
-
   return (
     <div className="relative w-full h-screen bg-gray-900 overflow-hidden">
       <Stage
+        ref={stageRef}
         width={windowSize.width}
         height={stageHeight}
+        onMouseMove={handleMouseMove}
         className="absolute top-1/2 left-0 transform -translate-y-1/2"
       >
         <Environment bitmask={environmentBitmask} blockSize={blockSize} />
@@ -78,8 +77,9 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
             x={playerPos.x}
             y={playerPos.y}
             health={health}
-            blockSize={blockSize}
             bitmask={environmentBitmask}
+            blockSize={blockSize}
+            turretAngle={turretAngle}
             onPositionChange={setPlayerPos}
           />
         </Layer>

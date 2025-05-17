@@ -5,10 +5,10 @@ export const PLAYER_SPEED = 5; // in environment units per second
 export const PLAYER_WIDTH = 1; // in environment units
 export const PLAYER_HEIGHT = 1; // in environment units
 export const PLAYER_GRAVITY = 9.8; // in environment units per second squared
-export const PLAYER_MAX_STEP_OVER = 3; // max blocks player can step over
-export const INITIAL_PLAYER_POS = { x: 40, y: 1 }; // in environment units (starting in air)
+export const PLAYER_MAX_STEP_OVER = 2; // max blocks player can step over
+export const INITIAL_PLAYER_POS = { x: 20, y: 1 }; // in environment units (starting in air)
 export const TERRAIN_CONFIG = {
-  airRows: 2, // number of air rows above terrain
-  amplitude: 3, // height of sine wave
+  airRows: 5, // number of air rows above terrain
+  amplitude: 15, // height of sine wave
   frequency: 0.1, // how many waves across the width
 };
