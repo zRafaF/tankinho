@@ -9,6 +9,9 @@ export const PLAYER_MAX_STEP_OVER = 2; // max blocks player can step over
 export const INITIAL_PLAYER_POS = { x: 20, y: 1 }; // in environment units (starting in air)
 export const TERRAIN_CONFIG = {
   airRows: 5, // number of air rows above terrain
-  amplitude: 15, // height of sine wave
+  amplitude: 3, // height of sine wave
   frequency: 0.1, // how many waves across the width
 };
+
+export const SHOOTING_POWER_BARS = 20; // number of discrete bars
+export const SHOOTING_LOAD_TIME_MS = 1000; // time to fill all bars
