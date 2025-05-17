@@ -9,7 +9,7 @@ export function usePlayerShoot(
   roundState: string,
   setRoundState: (s: any) => void,
   getTurretAngle: () => number,
-  playerPos: { x: number; y: number }
+  getPlayerPos: () => { x: number; y: number }
 ) {
   const [bullets, setBullets] = useState<any[]>([]);
   const nextBulletId = useRef(1);
@@ -31,6 +31,7 @@ export function usePlayerShoot(
       const angle = getTurretAngle();
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
+      const playerPos = getPlayerPos();
       const id = nextBulletId.current++;
       setBullets((bs) => [
         ...bs,
@@ -50,7 +51,7 @@ export function usePlayerShoot(
     isCharging,
     powerBars,
     getTurretAngle,
-    playerPos,
+    getPlayerPos,
     setRoundState,
   ]);
 
@@ -66,7 +67,6 @@ export function usePlayerShoot(
 
   return {
     bullets,
-    addBullet: setBullets,
     powerBars,
     isCharging,
     clearBullets,

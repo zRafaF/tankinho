@@ -1,4 +1,3 @@
-// components/game/hooks/useBulletPhysics.ts
 import { useEffect, useState } from "react";
 import {
   BULLET_GRAVITY,
@@ -17,7 +16,6 @@ export function useBulletPhysics(
 
   useEffect(() => {
     if (roundState !== "bullet") return;
-    // seed with newly fired bullets
     setUpdatedBullets(bullets);
 
     let raf: number;
@@ -47,10 +45,7 @@ export function useBulletPhysics(
             const tx = Math.floor(b.x),
               ty = Math.floor(b.y);
             const hitTerrain = getEnvironmentBit(bitmask, tx, ty);
-            if (outOfBounds || hitTerrain) {
-              return false;
-            }
-            return true;
+            return !(outOfBounds || hitTerrain);
           })
       );
 
@@ -61,14 +56,12 @@ export function useBulletPhysics(
     return () => cancelAnimationFrame(raf);
   }, [roundState, bullets, bitmask]);
 
-  // When all bullets dissipate, hand over turn
   useEffect(() => {
     if (roundState === "bullet" && updatedBullets.length === 0) {
       setRoundState("other");
     }
   }, [roundState, updatedBullets, setRoundState]);
 
-  // Expose a collision trigger that inspects the latest positions
   const handleBulletExplosion = (
     triggerExplosion: (id: number, x: number, y: number) => void
   ) => {
