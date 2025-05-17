@@ -55,7 +55,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
   );
 
   useTurretAngle(stageRef, blockSize, playerPos, roundState, setTurretAngle);
-  // each render: process any collisions
+  // process any collisions on each render
   handleBulletExplosion(triggerExplosion);
 
   const handleExit = () => {

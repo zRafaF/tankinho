@@ -1,3 +1,4 @@
+// components/game/hooks/useBulletPhysics.ts
 import { useEffect, useState } from "react";
 import {
   BULLET_GRAVITY,
@@ -7,58 +8,80 @@ import {
 import { getEnvironmentBit } from "@/lib/environmentUtils";
 
 export function useBulletPhysics(
-  roundState: string,
-  bullets: any[],
+  roundState: "player" | "bullet" | "other",
+  bullets: Array<{ id: number; x: number; y: number; vx: number; vy: number }>,
   bitmask: Uint8Array,
-  setRoundState: any
+  setRoundState: (s: "player" | "bullet" | "other") => void
 ) {
   const [updatedBullets, setUpdatedBullets] = useState(bullets);
 
   useEffect(() => {
     if (roundState !== "bullet") return;
-    let raf = 0;
+    // seed with newly fired bullets
+    setUpdatedBullets(bullets);
+
+    let raf: number;
     let last = performance.now();
+
     const step = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
-      setUpdatedBullets((list) =>
-        list
+
+      setUpdatedBullets((curr) =>
+        curr
           .map((b) => {
             const nvy = b.vy + BULLET_GRAVITY * dt;
-            return { ...b, x: b.x + b.vx * dt, y: b.y + nvy * dt, vy: nvy };
+            return {
+              ...b,
+              x: b.x + b.vx * dt,
+              y: b.y + nvy * dt,
+              vy: nvy,
+            };
           })
-          .filter(
-            (b) =>
-              b.x >= 0 &&
-              b.x <= ENVIRONMENT_WIDTH &&
-              b.y >= 0 &&
-              b.y <= ENVIRONMENT_HEIGHT &&
-              !getEnvironmentBit(bitmask, Math.floor(b.x), Math.floor(b.y))
-          )
+          .filter((b) => {
+            const outOfBounds =
+              b.x < 0 ||
+              b.x > ENVIRONMENT_WIDTH ||
+              b.y < 0 ||
+              b.y > ENVIRONMENT_HEIGHT;
+            const tx = Math.floor(b.x),
+              ty = Math.floor(b.y);
+            const hitTerrain = getEnvironmentBit(bitmask, tx, ty);
+            if (outOfBounds || hitTerrain) {
+              return false;
+            }
+            return true;
+          })
       );
+
       raf = requestAnimationFrame(step);
     };
+
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [roundState, bitmask]);
+  }, [roundState, bullets, bitmask]);
 
+  // When all bullets dissipate, hand over turn
   useEffect(() => {
     if (roundState === "bullet" && updatedBullets.length === 0) {
       setRoundState("other");
     }
-  }, [roundState, updatedBullets]);
+  }, [roundState, updatedBullets, setRoundState]);
 
+  // Expose a collision trigger that inspects the latest positions
   const handleBulletExplosion = (
     triggerExplosion: (id: number, x: number, y: number) => void
   ) => {
-    bullets.forEach((b) => {
-      if (
+    updatedBullets.forEach((b) => {
+      const outOfBounds =
         b.x < 0 ||
         b.x > ENVIRONMENT_WIDTH ||
         b.y < 0 ||
-        b.y > ENVIRONMENT_HEIGHT ||
-        getEnvironmentBit(bitmask, Math.floor(b.x), Math.floor(b.y))
-      ) {
+        b.y > ENVIRONMENT_HEIGHT;
+      const tx = Math.floor(b.x),
+        ty = Math.floor(b.y);
+      const hitTerrain = getEnvironmentBit(bitmask, tx, ty);
+      if (outOfBounds || hitTerrain) {
         triggerExplosion(b.id, b.x, b.y);
       }
     });
