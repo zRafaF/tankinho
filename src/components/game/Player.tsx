@@ -1,12 +1,14 @@
 import { Group, Rect, Text } from "react-konva";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import React from "react";
 import {
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
   PLAYER_SPEED,
   ENVIRONMENT_WIDTH,
+  ENVIRONMENT_HEIGHT,
 } from "@/config/gameConfig";
+import { getEnvironmentBit } from "@/lib/environmentUtils";
 
 interface PlayerProps {
   x: number;
@@ -17,7 +19,7 @@ interface PlayerProps {
   onPositionChange: (pos: { x: number; y: number }) => void;
 }
 
-export const Player = React.memo(function Player({
+function PlayerInner({
   x,
   y,
   health,
@@ -25,114 +27,142 @@ export const Player = React.memo(function Player({
   blockSize,
   onPositionChange,
 }: PlayerProps) {
-  console.log(2); // 🔁 Only prints when actual re-render happens
-
   const positionRef = useRef({ x, y });
-  const renderPositionRef = useRef({ x, y });
-  const [renderPosition, setRenderPosition] = useState({ x, y });
+  const [movingLeft, setMovingLeft] = React.useState(false);
+  const [movingRight, setMovingRight] = React.useState(false);
 
-  const [movingLeft, setMovingLeft] = useState(false);
-  const [movingRight, setMovingRight] = useState(false);
-
-  // Keyboard input setup
+  // === Keyboard Input ===
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const down = (e: KeyboardEvent) => {
       if (e.key === "a") setMovingLeft(true);
       if (e.key === "d") setMovingRight(true);
     };
-    const handleKeyUp = (e: KeyboardEvent) => {
+    const up = (e: KeyboardEvent) => {
       if (e.key === "a") setMovingLeft(false);
       if (e.key === "d") setMovingRight(false);
     };
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
     };
   }, []);
 
-  // Movement and animation loop
+  // === Movement + Snap to Ground ===
   useEffect(() => {
-    let animationFrameId: number;
+    let rafId: number;
     let lastTime = performance.now();
 
     const update = (time: number) => {
-      const deltaTime = (time - lastTime) / 1000;
+      const dt = (time - lastTime) / 1000;
       lastTime = time;
 
-      const pos = positionRef.current;
+      let newX = positionRef.current.x;
+      if (movingLeft) newX -= PLAYER_SPEED * dt;
+      if (movingRight) newX += PLAYER_SPEED * dt;
 
-      // Movement calculation
-      let velX = 0;
-      if (movingLeft) velX -= PLAYER_SPEED;
-      if (movingRight) velX += PLAYER_SPEED;
-
-      let newX = pos.x + velX * deltaTime;
-      const newY = pos.y;
-
+      // Clamp X
       newX = Math.max(
         PLAYER_WIDTH / 2,
         Math.min(newX, ENVIRONMENT_WIDTH - PLAYER_WIDTH / 2)
       );
 
-      const finalPos = { x: newX, y: newY };
+      // === Snap to ground ===
+      const halfW = PLAYER_WIDTH / 2;
+      const colStart = Math.floor(newX - halfW);
+      const colEnd = Math.floor(newX + halfW - 0.001);
 
-      positionRef.current = finalPos;
-
-      const prev = renderPositionRef.current;
-
-      if (finalPos.x !== prev.x || finalPos.y !== prev.y) {
-        renderPositionRef.current = finalPos;
-        setRenderPosition(finalPos);
-        onPositionChange(finalPos);
+      let groundRow = ENVIRONMENT_HEIGHT;
+      for (
+        let row = Math.ceil(y + PLAYER_HEIGHT / 2);
+        row < ENVIRONMENT_HEIGHT;
+        row++
+      ) {
+        if (
+          getEnvironmentBit(bitmask, colStart, row) ||
+          getEnvironmentBit(bitmask, colEnd, row)
+        ) {
+          groundRow = row;
+          break;
+        }
       }
 
-      animationFrameId = requestAnimationFrame(update);
+      const newY = groundRow - PLAYER_HEIGHT / 2;
+
+      const newPos = { x: newX, y: newY };
+      if (
+        newPos.x !== positionRef.current.x ||
+        newPos.y !== positionRef.current.y
+      ) {
+        positionRef.current = newPos;
+        onPositionChange(newPos);
+      }
+
+      rafId = requestAnimationFrame(update);
     };
 
-    animationFrameId = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [movingLeft, movingRight, onPositionChange]);
+    rafId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(rafId);
+  }, [movingLeft, movingRight, bitmask, y, onPositionChange]);
 
   // === Render ===
-  const playerWidth = PLAYER_WIDTH * blockSize;
-  const playerHeight = PLAYER_HEIGHT * blockSize;
+  console.log("Player render");
+
+  const pw = PLAYER_WIDTH * blockSize;
+  const ph = PLAYER_HEIGHT * blockSize;
 
   return (
-    <Group x={renderPosition.x * blockSize} y={renderPosition.y * blockSize}>
+    <Group x={x * blockSize} y={y * blockSize}>
       {/* Health Bar */}
-      <Group x={-playerWidth * 0.75} y={-playerHeight * 1.5}>
+      <Group y={-ph * 1.2}>
         <Rect
-          width={playerWidth * 1.5}
-          height={playerHeight * 0.25}
+          x={-pw * 0.75}
+          width={pw * 1.5}
+          height={blockSize * 0.3}
           fill="#444"
-          cornerRadius={Math.max(2, blockSize * 0.075)}
+          cornerRadius={blockSize * 0.1}
         />
         <Rect
-          width={(health / 100) * playerWidth * 1.5}
-          height={playerHeight * 0.25}
+          x={-pw * 0.75}
+          width={(health / 100) * pw * 1.5}
+          height={blockSize * 0.3}
           fill={health > 50 ? "#4ade80" : "#f87171"}
-          cornerRadius={Math.max(2, blockSize * 0.075)}
+          cornerRadius={blockSize * 0.1}
         />
         <Text
           text={`${health}%`}
-          x={blockSize * 0.1}
-          y={-blockSize * 0.05}
-          fontSize={blockSize * 0.3}
+          x={-pw * 0.75}
+          width={pw * 1.5}
+          height={blockSize * 0.3}
+          fontSize={blockSize * 0.25}
+          align="center"
+          verticalAlign="middle"
           fill="white"
         />
       </Group>
 
-      {/* Player Body */}
+      {/* Player body */}
       <Rect
-        x={-playerWidth / 2}
-        y={-playerHeight / 2}
-        width={playerWidth}
-        height={playerHeight}
+        x={-pw / 2}
+        y={-ph / 2}
+        width={pw}
+        height={ph}
         fill="#555"
-        cornerRadius={Math.max(3, blockSize * 0.1)}
+        cornerRadius={blockSize * 0.1}
       />
     </Group>
   );
-});
+}
+
+// Custom memo to avoid re-rendering unless props really changed
+export const Player = React.memo(
+  PlayerInner,
+  (prev, next) =>
+    prev.x === next.x &&
+    prev.y === next.y &&
+    prev.health === next.health &&
+    prev.blockSize === next.blockSize &&
+    prev.bitmask === next.bitmask &&
+    prev.onPositionChange === next.onPositionChange
+);

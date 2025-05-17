@@ -19,7 +19,7 @@ export const Environment = React.memo(function Environment({
           if (getEnvironmentBit(bitmask, x, y)) {
             // prints 1 every 10th block
             if (x % 50 === 0) {
-              console.log(1);
+              console.log("env render");
             }
 
             return (
