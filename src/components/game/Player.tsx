@@ -1,39 +1,40 @@
 import { Group, Rect, Text } from "react-konva";
 import { useEffect, useRef, useState } from "react";
+import React from "react";
 import {
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
   PLAYER_SPEED,
-  PLAYER_GRAVITY,
-  PLAYER_MAX_STEP_OVER,
   ENVIRONMENT_WIDTH,
 } from "@/config/gameConfig";
-import { isCollidingWithTerrain, canStepOver } from "@/lib/environmentUtils";
 
 interface PlayerProps {
   x: number;
   y: number;
   health: number;
-  blockSize: number;
   bitmask: Uint8Array;
+  blockSize: number;
   onPositionChange: (pos: { x: number; y: number }) => void;
 }
 
-export function Player({
+export const Player = React.memo(function Player({
   x,
   y,
   health,
-  blockSize,
   bitmask,
+  blockSize,
   onPositionChange,
 }: PlayerProps) {
+  console.log(2); // 🔁 Only prints when actual re-render happens
+
   const positionRef = useRef({ x, y });
-  const velocityRef = useRef({ x: 0, y: 0 });
+  const renderPositionRef = useRef({ x, y });
   const [renderPosition, setRenderPosition] = useState({ x, y });
 
   const [movingLeft, setMovingLeft] = useState(false);
   const [movingRight, setMovingRight] = useState(false);
 
+  // Keyboard input setup
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "a") setMovingLeft(true);
@@ -51,6 +52,7 @@ export function Player({
     };
   }, []);
 
+  // Movement and animation loop
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = performance.now();
@@ -60,96 +62,46 @@ export function Player({
       lastTime = time;
 
       const pos = positionRef.current;
-      const vel = velocityRef.current;
 
-      // Apply gravity
-      vel.y += PLAYER_GRAVITY * deltaTime;
+      // Movement calculation
+      let velX = 0;
+      if (movingLeft) velX -= PLAYER_SPEED;
+      if (movingRight) velX += PLAYER_SPEED;
 
-      // Horizontal input
-      vel.x = 0;
-      if (movingLeft) vel.x -= PLAYER_SPEED;
-      if (movingRight) vel.x += PLAYER_SPEED;
+      let newX = pos.x + velX * deltaTime;
+      const newY = pos.y;
 
-      // Predict next position
-      let newX = pos.x + vel.x * deltaTime;
-      let newY = pos.y + vel.y * deltaTime;
-
-      // === Horizontal movement and step-over logic ===
-      if (vel.x !== 0) {
-        const testX = newX;
-        const collided = isCollidingWithTerrain(
-          bitmask,
-          testX,
-          pos.y,
-          PLAYER_WIDTH,
-          PLAYER_HEIGHT
-        );
-
-        if (collided) {
-          // Try step-over
-          const stepResult = canStepOver(
-            bitmask,
-            testX,
-            pos.y - PLAYER_HEIGHT / 2,
-            PLAYER_WIDTH,
-            PLAYER_MAX_STEP_OVER
-          );
-          if (stepResult.canStep && stepResult.newY) {
-            newX = testX;
-            newY = stepResult.newY;
-            vel.y = 0;
-          } else {
-            // Block horizontal movement
-            newX = pos.x;
-          }
-        }
-      }
-
-      // === Vertical movement (gravity & falling) ===
-      const verticalCollision = isCollidingWithTerrain(
-        bitmask,
-        newX,
-        newY,
-        PLAYER_WIDTH,
-        PLAYER_HEIGHT
-      );
-
-      if (verticalCollision) {
-        if (vel.y > 0) {
-          // Falling, snap to ground
-          newY = Math.floor(newY + PLAYER_HEIGHT / 2) - PLAYER_HEIGHT / 2;
-        }
-        vel.y = 0;
-      }
-
-      // Clamp horizontal position
       newX = Math.max(
         PLAYER_WIDTH / 2,
         Math.min(newX, ENVIRONMENT_WIDTH - PLAYER_WIDTH / 2)
       );
 
-      // Finalize position
       const finalPos = { x: newX, y: newY };
+
       positionRef.current = finalPos;
 
-      // Update React state for rendering
-      setRenderPosition(finalPos);
-      onPositionChange(finalPos);
+      const prev = renderPositionRef.current;
+
+      if (finalPos.x !== prev.x || finalPos.y !== prev.y) {
+        renderPositionRef.current = finalPos;
+        setRenderPosition(finalPos);
+        onPositionChange(finalPos);
+      }
 
       animationFrameId = requestAnimationFrame(update);
     };
 
     animationFrameId = requestAnimationFrame(update);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [bitmask, movingLeft, movingRight, onPositionChange]);
+  }, [movingLeft, movingRight, onPositionChange]);
 
-  // === RENDER ===
+  // === Render ===
   const playerWidth = PLAYER_WIDTH * blockSize;
   const playerHeight = PLAYER_HEIGHT * blockSize;
 
   return (
     <Group x={renderPosition.x * blockSize} y={renderPosition.y * blockSize}>
-      {/* Health bar */}
+      {/* Health Bar */}
       <Group x={-playerWidth * 0.75} y={-playerHeight * 1.5}>
         <Rect
           width={playerWidth * 1.5}
@@ -172,7 +124,7 @@ export function Player({
         />
       </Group>
 
-      {/* Player body */}
+      {/* Player Body */}
       <Rect
         x={-playerWidth / 2}
         y={-playerHeight / 2}
@@ -183,4 +135,4 @@ export function Player({
       />
     </Group>
   );
-}
+});

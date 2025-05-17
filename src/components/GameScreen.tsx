@@ -25,7 +25,8 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
   });
   const { roomCode, disconnectFromMatch } = useGameConnectionContext();
 
-  const [environmentBitmask] = useState<Uint8Array>(createTerrain);
+  const [environmentBitmask, setEnvironmentBitmask] =
+    useState<Uint8Array>(createTerrain);
 
   // Full-width responsive scaling
   useEffect(() => {
@@ -51,6 +52,18 @@ export default function GameScreen({ onExitGame }: GameScreenProps) {
     disconnectFromMatch();
     onExitGame();
   };
+
+  // // runs every second
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     // sets a random bitmask to 0
+  //     const random = Math.floor(Math.random() * environmentBitmask.length);
+  //     const newBitmask = new Uint8Array(environmentBitmask);
+  //     newBitmask[random] = 0;
+  //     setEnvironmentBitmask(newBitmask);
+  //   }, 1000);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   return (
     <div className="relative w-full h-screen bg-gray-900 overflow-hidden">

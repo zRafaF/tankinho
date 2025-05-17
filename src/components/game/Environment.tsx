@@ -1,18 +1,27 @@
 import { Layer, Rect } from "react-konva";
 import { getEnvironmentBit } from "@/lib/environmentUtils";
 import { ENVIRONMENT_WIDTH, ENVIRONMENT_HEIGHT } from "@/config/gameConfig";
+import React from "react";
 
 interface EnvironmentProps {
   bitmask: Uint8Array;
   blockSize: number;
 }
 
-export function Environment({ bitmask, blockSize }: EnvironmentProps) {
+export const Environment = React.memo(function Environment({
+  bitmask,
+  blockSize,
+}: EnvironmentProps) {
   return (
     <Layer>
       {Array.from({ length: ENVIRONMENT_HEIGHT }).map((_, y) =>
         Array.from({ length: ENVIRONMENT_WIDTH }).map((_, x) => {
           if (getEnvironmentBit(bitmask, x, y)) {
+            // prints 1 every 10th block
+            if (x % 50 === 0) {
+              console.log(1);
+            }
+
             return (
               <Rect
                 key={`${x}-${y}`}
@@ -31,4 +40,4 @@ export function Environment({ bitmask, blockSize }: EnvironmentProps) {
       )}
     </Layer>
   );
-}
+});
