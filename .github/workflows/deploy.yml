@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-      - uses: actions/checkout@v3
+        uses: actions/checkout@v3
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
@@ -25,7 +25,7 @@ jobs:
 
       - name: Build
         run: pnpm build
-        
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         if: ${{ github.ref == 'refs/heads/main' }}
