@@ -65,6 +65,8 @@ export default function GameScreen({
     currentTurn,
     setCurrentTurn,
     isHost,
+    bitmask,
+    setBitmask,
   } = useGameConnectionContext();
   const [playerPos, setPlayerPos] = useState(
     isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS
@@ -76,7 +78,6 @@ export default function GameScreen({
   const [isCharging, setIsCharging] = useState(false);
   const [powerBars, setPowerBars] = useState(1);
 
-  const [bitmask, setBitmask] = useState<Uint8Array>(() => createTerrain());
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const nextBulletId = useRef(1);
   const [explosions, setExplosions] = useState<Explosion[]>([]);

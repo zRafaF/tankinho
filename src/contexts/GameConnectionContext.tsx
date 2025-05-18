@@ -5,6 +5,7 @@ import {
   useEffect,
   useCallback,
   useRef,
+  type Dispatch,
 } from "react";
 import {
   ClientMessageSchema,
@@ -19,6 +20,7 @@ import {
   type TurnUpdate,
 } from "@/gen/proto/game_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
+import { createTerrain } from "@/lib/environmentUtils";
 
 type ConnectionState = "connecting" | "connected" | "disconnected" | "error";
 
@@ -33,6 +35,9 @@ interface GameConnectionContextValue {
   disconnectFromMatch: () => void;
   isConnected: boolean;
   isConnecting: boolean;
+
+  bitmask: Uint8Array;
+  setBitmask: Dispatch<React.SetStateAction<Uint8Array>>;
 
   latestOpponentState: DynamicUpdate | null;
   setLatestOpponentState: (update: DynamicUpdate) => void;
@@ -69,6 +74,8 @@ export const GameConnectionProvider = ({
   onStartMatch?: () => void;
   onOtherPlayerDisconnected?: () => void;
 }) => {
+  const [bitmask, setBitmask] = useState<Uint8Array>(() => createTerrain());
+
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("connecting");
   const [roomCode, setRoomCode] = useState("");
@@ -157,7 +164,7 @@ export const GameConnectionProvider = ({
                 case "turnUpdate":
                   const turnUpdate = gameUpdate.data.value;
                   setCurrentTurn(turnUpdate.turn);
-                  // setBitmask(turnUpdate.bitMask);
+                  setBitmask(turnUpdate.bitMask);
                   break;
               }
               break;
@@ -268,6 +275,10 @@ export const GameConnectionProvider = ({
     disconnectFromMatch,
     isConnected: connectionState === "connected",
     isConnecting: connectionState === "connecting",
+
+    bitmask,
+    setBitmask,
+
     latestOpponentState,
     setLatestOpponentState,
     sendDynamicUpdate,
