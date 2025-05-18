@@ -149,15 +149,16 @@ export const GameConnectionProvider = ({
 
             case "gameUpdate": {
               const gameUpdate = serverMessage.message.value;
-              if (gameUpdate.data.case === "dynamicUpdate") {
-                const dynamic = gameUpdate.data.value;
-                const theirTurn = dynamic.turn;
-                const myTurn = isHost ? Turn.HOST : Turn.GUEST;
-                console.log("received dynamic update", dynamic);
-
-                if (theirTurn !== myTurn) {
+              switch (gameUpdate.data.case) {
+                case "dynamicUpdate":
+                  const dynamic = gameUpdate.data.value;
                   setLatestOpponentState(dynamic);
-                }
+                  break;
+                case "turnUpdate":
+                  const turnUpdate = gameUpdate.data.value;
+                  setCurrentTurn(turnUpdate.turn);
+                  // setBitmask(turnUpdate.bitMask);
+                  break;
               }
               break;
             }
@@ -225,7 +226,6 @@ export const GameConnectionProvider = ({
         !socket.readyState
       )
         return;
-      console.log("socket", socket);
 
       const wrapper = create(GameUpdateSchema, {
         matchId: roomCode,

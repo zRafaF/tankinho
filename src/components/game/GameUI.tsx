@@ -12,6 +12,7 @@ interface GameUIProps {
   turnTime: number;
   powerBars: number;
   isCharging: boolean;
+  isMyTurn: boolean;
 }
 
 export function GameUI({

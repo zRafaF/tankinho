@@ -5,10 +5,10 @@ import {
   ENVIRONMENT_WIDTH,
   ENVIRONMENT_HEIGHT,
   INITIAL_PLAYER_POS,
+  INITIAL_GUEST_POS,
   SHOOTING_POWER_BARS,
   SHOOTING_POWER_INTERVAL_MS,
   TURN_TIME_SEC,
-  TURN_DELAY_MS,
   BULLET_GRAVITY,
   BULLET_SPEED_FACTOR,
   EXPLOSION_RADIUS,
@@ -22,8 +22,7 @@ import {
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
 import { GameUI } from "@/components/game/GameUI";
-import { create } from "@bufbuild/protobuf"; // Make sure this import is present
-
+import { create } from "@bufbuild/protobuf";
 import {
   BulletSchema,
   DynamicUpdateSchema,
@@ -49,18 +48,35 @@ interface Explosion {
 
 type RoundState = "player" | "bullet" | "other";
 
-export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
+export default function GameScreen({
+  onExitGame,
+  gameStarted,
+}: {
+  onExitGame: () => void;
+  gameStarted: boolean;
+}) {
   const [health, setHealth] = useState(100);
-  const [playerPos, setPlayerPos] = useState(INITIAL_PLAYER_POS);
+  const {
+    roomCode,
+    disconnectFromMatch,
+    latestOpponentState,
+    sendDynamicUpdate,
+    sendTurnUpdate,
+    currentTurn,
+    setCurrentTurn,
+    isHost,
+  } = useGameConnectionContext();
+  const [playerPos, setPlayerPos] = useState(
+    isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS
+  );
   const [turretAngle, setTurretAngle] = useState(0);
-  const [roundState, setRoundState] = useState<RoundState>("player");
+  const [roundState, setRoundState] = useState<RoundState>("other");
   const [turnTime, setTurnTime] = useState(TURN_TIME_SEC);
 
   const [isCharging, setIsCharging] = useState(false);
   const [powerBars, setPowerBars] = useState(1);
 
   const [bitmask, setBitmask] = useState<Uint8Array>(() => createTerrain());
-
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const nextBulletId = useRef(1);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
@@ -72,16 +88,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     height: window.innerHeight,
   });
 
-  const {
-    roomCode,
-    disconnectFromMatch,
-    isHost,
-    currentTurn,
-    latestOpponentState,
-    sendDynamicUpdate,
-    sendTurnUpdate,
-  } = useGameConnectionContext();
-
   const stageRef = useRef<any>(null);
   const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
   const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
@@ -92,7 +98,16 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
   const [opponentAngle, setOpponentAngle] = useState(0);
   const [opponentHealth, setOpponentHealth] = useState(100);
 
-  // Sync opponent state when we receive it
+  // Initialize game start
+  useEffect(() => {
+    if (gameStarted && isHost) {
+      setRoundState("player");
+      setTurnTime(TURN_TIME_SEC);
+      setCurrentTurn(Turn.HOST);
+    }
+  }, [gameStarted, isHost, setCurrentTurn]);
+
+  // Sync opponent state
   useEffect(() => {
     if (!latestOpponentState) return;
     const opponentPlayer = isHost
@@ -108,7 +123,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     }
   }, [latestOpponentState, isHost]);
 
-  // Send dynamic update every 300ms on our turn
+  // Dynamic updates
   const latestState = useRef({
     playerPos,
     turretAngle,
@@ -118,7 +133,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     isHost,
   });
 
-  // Keep the ref updated
   useEffect(() => {
     latestState.current = {
       playerPos,
@@ -130,7 +144,6 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     };
   }, [playerPos, turretAngle, bullets, health, turnTime, isHost]);
 
-  // Immediate first update
   const sendUpdate = () => {
     const { playerPos, turretAngle, bullets, health, turnTime, isHost } =
       latestState.current;
@@ -154,7 +167,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
       hostPlayer: isHost ? me : undefined,
       guestPlayer: !isHost ? me : undefined,
       bullets: bulletMessages,
-      turn: isHost ? Turn.HOST : Turn.GUEST,
+      turn: currentTurn,
     });
 
     sendDynamicUpdate(dynamic);
@@ -163,15 +176,74 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
   useEffect(() => {
     if (!isMyTurn || roundState === "other") return;
 
-    // Send initial update immediately
     sendUpdate();
-
-    // Then set up regular interval
     const id = setInterval(sendUpdate, 300);
-
     return () => clearInterval(id);
-  }, [isMyTurn, roundState, sendDynamicUpdate]); // Only essential dependencies
+  }, [isMyTurn, roundState, sendDynamicUpdate, currentTurn]);
 
+  // Handle turn transitions when bullets are done
+  useEffect(() => {
+    if (roundState === "bullet" && bullets.length === 0) {
+      sendUpdate();
+      const newTurn = isHost ? Turn.GUEST : Turn.HOST;
+      const update = create(TurnUpdateSchema, {
+        bitMask: bitmask,
+        turn: newTurn,
+      });
+      sendTurnUpdate(update);
+      setCurrentTurn(newTurn);
+      setRoundState("other");
+    }
+  }, [
+    roundState,
+    bullets.length,
+    bitmask,
+    isHost,
+    sendTurnUpdate,
+    setCurrentTurn,
+  ]);
+
+  // Handle incoming turn updates
+  useEffect(() => {
+    if (!latestOpponentState) return;
+
+    const theirTurn = latestOpponentState.turn;
+    if (theirTurn !== currentTurn) {
+      setCurrentTurn(theirTurn);
+      if (theirTurn === (isHost ? Turn.HOST : Turn.GUEST)) {
+        setRoundState("player");
+        setTurnTime(TURN_TIME_SEC);
+        setPlayerPos(isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS);
+      }
+    }
+  }, [latestOpponentState, currentTurn, isHost, setCurrentTurn]);
+
+  // Turn timer
+  useEffect(() => {
+    if (roundState !== "player") return;
+
+    let animationFrameId: number;
+    let startTime = Date.now();
+
+    const updateTimer = () => {
+      const elapsed = Date.now() - startTime;
+      const remaining = TURN_TIME_SEC - Math.floor(elapsed / 1000);
+
+      if (remaining <= 0) {
+        setTurnTime(0);
+        setRoundState("other");
+        return;
+      }
+
+      setTurnTime(remaining);
+      animationFrameId = requestAnimationFrame(updateTimer);
+    };
+
+    animationFrameId = requestAnimationFrame(updateTimer);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [roundState]);
+
+  // Window resize handler
   useEffect(() => {
     const onResize = () =>
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
@@ -179,32 +251,9 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Mouse movement for aiming
   useEffect(() => {
-    if (roundState !== "player") return;
-    setTurnTime(TURN_TIME_SEC);
-    const id = window.setInterval(() => {
-      setTurnTime((t) => {
-        if (t <= 1) {
-          clearInterval(id);
-          setRoundState("other");
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [roundState]);
-
-  useEffect(() => {
-    if (roundState !== "other") return;
-    const id = window.setTimeout(() => {
-      setRoundState("player");
-    }, TURN_DELAY_MS);
-    return () => clearTimeout(id);
-  }, [roundState]);
-
-  useEffect(() => {
-    if (roundState !== "player") return;
+    if (roundState !== "player" || !isMyTurn) return;
     const onMove = (e: MouseEvent) => {
       if (!stageRef.current) return;
       const rect = stageRef.current.container().getBoundingClientRect();
@@ -214,18 +263,19 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     };
     window.addEventListener("mousemove", onMove);
     return () => window.removeEventListener("mousemove", onMove);
-  }, [roundState, playerPos, blockSize]);
+  }, [roundState, playerPos, blockSize, isMyTurn]);
 
+  // Shooting controls
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
-      if (roundState !== "player") return;
+      if (roundState !== "player" || !isMyTurn) return;
       if (e.code === "Space" && !isCharging) {
         setIsCharging(true);
         setPowerBars(1);
       }
     };
     const onUp = (e: KeyboardEvent) => {
-      if (roundState !== "player") return;
+      if (roundState !== "player" || !isMyTurn) return;
       if (e.code === "Space" && isCharging) {
         setIsCharging(false);
         const frac = powerBars / SHOOTING_POWER_BARS;
@@ -246,16 +296,18 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
     };
-  }, [roundState, isCharging, powerBars, turretAngle, playerPos]);
+  }, [roundState, isCharging, powerBars, turretAngle, playerPos, isMyTurn]);
 
+  // Power charging
   useEffect(() => {
-    if (roundState !== "player" || !isCharging) return;
+    if (roundState !== "player" || !isCharging || !isMyTurn) return;
     const id = window.setInterval(() => {
       setPowerBars((b) => Math.min(b + 1, SHOOTING_POWER_BARS));
     }, SHOOTING_POWER_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [roundState, isCharging]);
+  }, [roundState, isCharging, isMyTurn]);
 
+  // Bullet physics
   useEffect(() => {
     if (roundState !== "bullet") return;
     let raf = 0;
@@ -294,20 +346,19 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     return () => cancelAnimationFrame(raf);
   }, [roundState, bitmask]);
 
+  // Check for game over
   useEffect(() => {
-    if (roundState === "bullet" && bullets.length === 0) {
-      // Final dynamic update (with latest opponent state)
-      sendUpdate(); // must use latest state ref
-
+    if (health <= 0) {
+      const newTurn = isHost ? Turn.GUEST : Turn.HOST;
       const update = create(TurnUpdateSchema, {
         bitMask: bitmask,
-        turn: isHost ? Turn.GUEST : Turn.HOST,
+        turn: newTurn,
       });
       sendTurnUpdate(update);
-
+      setCurrentTurn(newTurn);
       setRoundState("other");
     }
-  }, [roundState, bullets.length]);
+  }, [health, bitmask, isHost, sendTurnUpdate, setCurrentTurn]);
 
   const triggerExplosion = (bid: number, wx: number, wy: number) => {
     if (explodedBullets.current.has(bid)) return;
@@ -359,7 +410,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
             bitmask={bitmask}
             blockSize={blockSize}
             turretAngle={turretAngle}
-            isTurnActive={roundState === "player"}
+            isTurnActive={roundState === "player" && isMyTurn}
             isLocalPlayer={true}
             onPositionChange={setPlayerPos}
           />
@@ -401,6 +452,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
         turnTime={turnTime}
         powerBars={powerBars}
         isCharging={isCharging}
+        isMyTurn={isMyTurn}
       />
     </div>
   );

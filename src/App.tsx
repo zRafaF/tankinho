@@ -14,6 +14,7 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState>({
     status: "connecting",
   });
+  const [gameStarted, setGameStarted] = useState(false);
 
   return (
     <GameConnectionProvider
@@ -36,11 +37,13 @@ export default function App() {
           ...prev,
           status: "in-game",
         }));
+        setGameStarted(true);
       }}
       onOtherPlayerDisconnected={() => {
         setGameState({
           status: "connecting",
         });
+        setGameStarted(false);
       }}
     >
       <div className="w-full h-screen bg-gray-900">
@@ -50,6 +53,7 @@ export default function App() {
           <>
             <GameScreen
               onExitGame={() => setGameState({ status: "connecting" })}
+              gameStarted={gameStarted}
             />
             {gameState.status === "waiting" && gameState.isHost && (
               <HostWaitingScreen
