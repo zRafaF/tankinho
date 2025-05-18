@@ -18,7 +18,6 @@ export default function HostWaitingScreen({ onExit }: { onExit: () => void }) {
     disconnectFromMatch();
     onExit();
   };
-  return null;
 
   return (
     <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center">

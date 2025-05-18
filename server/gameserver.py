@@ -2,7 +2,7 @@ import sys
 
 sys.path.append("server/proto/")
 from proto.connection_pb2 import ClientMessage, ServerMessage, Error
-from proto.game_pb2 import GameUpdate
+from proto.game_pb2 import GameUpdate, Turn
 import websockets
 from helpers import *
 
@@ -22,6 +22,7 @@ class GameServer:
         self.matches: dict[str, Match] = {}  # Hash table of match_id to Match object
 
     async def handle_connection(self, websocket: websockets.ServerConnection):
+        print(self.matches)
         try:
             async for message in websocket:
                 client_msg = ClientMessage()
@@ -40,7 +41,24 @@ class GameServer:
                     await self.handle_game_update(websocket, client_msg.game_update)
 
         except websockets.exceptions.ConnectionClosed:
-            await self.handle_disconnect(websocket)
+            await self.handle_connection_closed(websocket)
+        except Exception as e:
+            print(f"Unexpected error in handle_connection: {e}")
+
+    async def handle_connection_closed(self, websocket: websockets.ServerConnection):
+        print(f"Connection closed: {websocket}")
+        # Find all matches where the disconnected websocket is host or guest
+        to_remove = []
+        for match_id, match in self.matches.items():
+            if (
+                match.host_connection == websocket
+                or match.guest_connection == websocket
+            ):
+                to_remove.append(match_id)
+
+        # Process each affected match
+        for match_id in to_remove:
+            await self.handle_disconnect(match_id)
 
     async def handle_client_flags(
         self, websocket: websockets.ServerConnection, flags: ClientMessage.ClientFlags
@@ -50,6 +68,7 @@ class GameServer:
             print("Client flags: NONE")
 
     async def handle_create_match(self, websocket: websockets.ServerConnection):
+        print("Creating match...")
         while True:
             match_id = get_random_match_id()
             if match_id not in self.matches:
@@ -67,11 +86,32 @@ class GameServer:
     async def handle_game_update(
         self, websocket: websockets.ServerConnection, game_update: GameUpdate
     ):
-        print(f"Game update received: {game_update}")
+        if game_update.dynamic_update:
+            match = self.matches.get(game_update.match_id)
+            if match is not None:
+                target_ws = (
+                    match.guest_connection
+                    if game_update.dynamic_update.turn == Turn.TURN_HOST
+                    else match.host_connection
+                )
+
+                if target_ws is not None:
+                    response = ServerMessage()
+                    response.game_update.dynamic_update.CopyFrom(
+                        game_update.dynamic_update
+                    )
+                    try:
+                        await target_ws.send(response.SerializeToString())
+                    except websockets.exceptions.ConnectionClosed:
+                        print("Failed to send update - connection closed")
+                        await self.handle_connection_closed(target_ws)
+        elif game_update.turn_update:
+            print(f"turn: {game_update}")
 
     async def handle_join_match(
         self, websocket: websockets.ServerConnection, match_id: str
     ):
+        print(f"Match ID for joining websocket: {match_id}")
         if match_id not in self.matches:
             error = ServerMessage()
             error.error.message = "Match not found"
@@ -96,33 +136,49 @@ class GameServer:
 
         success = ServerMessage()
         success.server_flags = ServerMessage.SERVER_START_MATCH
-        await match.host_connection.send(success.SerializeToString())
-        await match.guest_connection.send(success.SerializeToString())
+        try:
+            await match.host_connection.send(success.SerializeToString())
+            await match.guest_connection.send(success.SerializeToString())
+        except websockets.exceptions.ConnectionClosed:
+            print("Failed to send start match - connection closed")
+            await self.handle_connection_closed(websocket)
+            return
 
         print(f"Guest player has joined match: {match_id}")
 
     async def handle_disconnect(self, match_id: str):
         print(f"Match ID for disconnecting websocket: {match_id}")
 
-        if not match_id:
+        if not match_id or match_id not in self.matches:
+            print(f"Invalid match ID or match not found: {match_id}")
             return
 
         match = self.matches[match_id]
 
-        if match is None:
-            print(f"Match not found for ID: {match_id}")
-            return
+        # Notify the other player if they're still connected
+        try:
+            if match.guest_connection is not None:
+                error = ServerMessage()
+                error.error.message = "Host disconnected"
+                error.error.type = Error.ERROR_HOST_DISCONNECTED
+                try:
+                    await match.guest_connection.send(error.SerializeToString())
+                except websockets.exceptions.ConnectionClosed:
+                    print("Guest connection already closed")
+        except Exception as e:
+            print(f"Error notifying guest: {e}")
 
-        if match.guest_connection is not None:
-            error = ServerMessage()
-            error.error.message = "Host disconnected"
-            error.error.type = Error.ERROR_HOST_DISCONNECTED
-            await match.guest_connection.send(error.SerializeToString())
-        if match.host_connection is not None:
-            error = ServerMessage()
-            error.error.message = "Guest disconnected"
-            error.error.type = Error.ERROR_GUEST_DISCONNECTED
-            await match.host_connection.send(error.SerializeToString())
+        try:
+            if match.host_connection is not None:
+                error = ServerMessage()
+                error.error.message = "Guest disconnected"
+                error.error.type = Error.ERROR_GUEST_DISCONNECTED
+                try:
+                    await match.host_connection.send(error.SerializeToString())
+                except websockets.exceptions.ConnectionClosed:
+                    print("Host connection already closed")
+        except Exception as e:
+            print(f"Error notifying host: {e}")
 
         print(f"Player disconnected from match: {match_id}")
         del self.matches[match_id]

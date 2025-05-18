@@ -29,6 +29,7 @@ import {
   DynamicUpdateSchema,
   PlayerSchema,
   Turn,
+  TurnUpdateSchema,
   Vec2Schema,
 } from "@/gen/proto/game_pb";
 
@@ -78,6 +79,7 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     currentTurn,
     latestOpponentState,
     sendDynamicUpdate,
+    sendTurnUpdate,
   } = useGameConnectionContext();
 
   const stageRef = useRef<any>(null);
@@ -128,38 +130,38 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
     };
   }, [playerPos, turretAngle, bullets, health, turnTime, isHost]);
 
+  // Immediate first update
+  const sendUpdate = () => {
+    const { playerPos, turretAngle, bullets, health, turnTime, isHost } =
+      latestState.current;
+
+    const me = create(PlayerSchema, {
+      position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
+      velocity: create(Vec2Schema, { x: 0, y: 0 }),
+      aimAngle: turretAngle,
+      health,
+      timeLeft: turnTime,
+    });
+
+    const bulletMessages = bullets.map((b) =>
+      create(BulletSchema, {
+        position: create(Vec2Schema, { x: b.x, y: b.y }),
+        velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+      })
+    );
+
+    const dynamic = create(DynamicUpdateSchema, {
+      hostPlayer: isHost ? me : undefined,
+      guestPlayer: !isHost ? me : undefined,
+      bullets: bulletMessages,
+      turn: isHost ? Turn.HOST : Turn.GUEST,
+    });
+
+    sendDynamicUpdate(dynamic);
+  };
+
   useEffect(() => {
     if (!isMyTurn || roundState === "other") return;
-
-    // Immediate first update
-    const sendUpdate = () => {
-      const { playerPos, turretAngle, bullets, health, turnTime, isHost } =
-        latestState.current;
-
-      const me = create(PlayerSchema, {
-        position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
-        velocity: create(Vec2Schema, { x: 0, y: 0 }),
-        aimAngle: turretAngle,
-        health,
-        timeLeft: turnTime,
-      });
-
-      const bulletMessages = bullets.map((b) =>
-        create(BulletSchema, {
-          position: create(Vec2Schema, { x: b.x, y: b.y }),
-          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
-        })
-      );
-
-      const dynamic = create(DynamicUpdateSchema, {
-        hostPlayer: isHost ? me : undefined,
-        guestPlayer: !isHost ? me : undefined,
-        bullets: bulletMessages,
-        turn: isHost ? Turn.HOST : Turn.GUEST,
-      });
-
-      sendDynamicUpdate(dynamic);
-    };
 
     // Send initial update immediately
     sendUpdate();
@@ -294,6 +296,15 @@ export default function GameScreen({ onExitGame }: { onExitGame: () => void }) {
 
   useEffect(() => {
     if (roundState === "bullet" && bullets.length === 0) {
+      // Final dynamic update (with latest opponent state)
+      sendUpdate(); // must use latest state ref
+
+      const update = create(TurnUpdateSchema, {
+        bitMask: bitmask,
+        turn: isHost ? Turn.GUEST : Turn.HOST,
+      });
+      sendTurnUpdate(update);
+
       setRoundState("other");
     }
   }, [roundState, bullets.length]);

@@ -16,6 +16,7 @@ import {
   Turn,
   GameUpdateSchema,
   type DynamicUpdate,
+  type TurnUpdate,
 } from "@/gen/proto/game_pb";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 
@@ -36,6 +37,7 @@ interface GameConnectionContextValue {
   latestOpponentState: DynamicUpdate | null;
   setLatestOpponentState: (update: DynamicUpdate) => void;
   sendDynamicUpdate: (update: DynamicUpdate) => void;
+  sendTurnUpdate: (update: TurnUpdate) => void;
   currentTurn: Turn;
   setCurrentTurn: (t: Turn) => void;
 }
@@ -79,98 +81,97 @@ export const GameConnectionProvider = ({
 
   const socketRef = useRef<WebSocket | null>(null);
 
-  useEffect(() => {
-    const ws = new WebSocket(import.meta.env.VITE_WS_SERVER);
-    ws.binaryType = "arraybuffer";
-    socketRef.current = ws;
+  useEffect(
+    () => {
+      const ws = new WebSocket(import.meta.env.VITE_WS_SERVER);
+      ws.binaryType = "arraybuffer";
+      socketRef.current = ws;
 
-    ws.onopen = () => {
-      setConnectionState("connected");
-      setError("");
-    };
+      ws.onopen = () => {
+        setConnectionState("connected");
+        setError("");
+      };
 
-    ws.onclose = () => {
-      setConnectionState("disconnected");
-    };
+      ws.onclose = () => {
+        setConnectionState("disconnected");
+      };
 
-    ws.onerror = (event) => {
-      console.error("WebSocket error:", event);
-      setConnectionState("error");
-      setError("Connection error. Please try again.");
-    };
+      ws.onerror = (event) => {
+        console.error("WebSocket error:", event);
+        setConnectionState("error");
+        setError("Connection error. Please try again.");
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const data = new Uint8Array(event.data);
-        const serverMessage = fromBinary(ServerMessageSchema, data);
+      ws.onmessage = (event) => {
+        try {
+          const data = new Uint8Array(event.data);
+          const serverMessage = fromBinary(ServerMessageSchema, data);
 
-        switch (serverMessage.message.case) {
-          case "error":
-            setError(serverMessage.message.value.message);
-            if (
-              serverMessage.message.value.type ===
-                Error_Type.ERROR_HOST_DISCONNECTED ||
-              serverMessage.message.value.type ===
-                Error_Type.ERROR_GUEST_DISCONNECTED
-            ) {
-              onOtherPlayerDisconnected?.();
-            }
-            break;
-
-          case "success":
-            setError("");
-            break;
-
-          case "matchCreated":
-            setRoomCode(serverMessage.message.value.matchId);
-            setPlayerId(serverMessage.message.value.playerId);
-            setIsHost(true);
-            onCreateHost(serverMessage.message.value.matchId);
-            break;
-
-          case "matchJoined":
-            setRoomCode(serverMessage.message.value.matchId);
-            setPlayerId(serverMessage.message.value.playerId);
-            setIsHost(false);
-            onJoinGuest(serverMessage.message.value.matchId);
-            break;
-
-          case "serverFlags":
-            if (
-              serverMessage.message.value ===
-              ServerMessage_ServerFlags.SERVER_START_MATCH
-            ) {
-              onStartMatch?.();
-            }
-            break;
-
-          case "gameUpdate": {
-            const gameUpdate = serverMessage.message.value;
-            if (gameUpdate.data.case === "dynamicUpdate") {
-              const dynamic = gameUpdate.data.value;
-              const theirTurn = dynamic.turn;
-              const myTurn = isHost ? Turn.HOST : Turn.GUEST;
-              if (theirTurn !== myTurn) {
-                setLatestOpponentState(dynamic);
+          switch (serverMessage.message.case) {
+            case "error":
+              setError(serverMessage.message.value.message);
+              if (
+                serverMessage.message.value.type ===
+                  Error_Type.ERROR_HOST_DISCONNECTED ||
+                serverMessage.message.value.type ===
+                  Error_Type.ERROR_GUEST_DISCONNECTED
+              ) {
+                onOtherPlayerDisconnected?.();
               }
-            }
-            break;
-          }
-        }
-      } catch (e) {
-        console.error("Message parsing error:", e);
-        setError("Invalid server response");
-      }
-    };
+              break;
 
-    return () => ws.close();
-  }, [
-    isHost,
-    onCreateHost,
-    onJoinGuest,
-    onOtherPlayerDisconnected,
-    onStartMatch,
-  ]);
+            case "success":
+              setError("");
+              break;
+
+            case "matchCreated":
+              setRoomCode(serverMessage.message.value.matchId);
+              setPlayerId(serverMessage.message.value.playerId);
+              setIsHost(true);
+              onCreateHost(serverMessage.message.value.matchId);
+              break;
+
+            case "matchJoined":
+              setRoomCode(serverMessage.message.value.matchId);
+              setPlayerId(serverMessage.message.value.playerId);
+              setIsHost(false);
+              onJoinGuest(serverMessage.message.value.matchId);
+              break;
+
+            case "serverFlags":
+              if (
+                serverMessage.message.value ===
+                ServerMessage_ServerFlags.SERVER_START_MATCH
+              ) {
+                onStartMatch?.();
+              }
+              break;
+
+            case "gameUpdate": {
+              const gameUpdate = serverMessage.message.value;
+              if (gameUpdate.data.case === "dynamicUpdate") {
+                const dynamic = gameUpdate.data.value;
+                const theirTurn = dynamic.turn;
+                const myTurn = isHost ? Turn.HOST : Turn.GUEST;
+                console.log("received dynamic update", dynamic);
+
+                if (theirTurn !== myTurn) {
+                  setLatestOpponentState(dynamic);
+                }
+              }
+              break;
+            }
+          }
+        } catch (e) {
+          console.error("Message parsing error:", e);
+          setError("Invalid server response");
+        }
+      };
+
+      return () => ws.close();
+    },
+    [] // needs to be empty to avoid weak websocket connection
+  );
 
   const createMatch = useCallback(() => {
     const socket = socketRef.current;
@@ -217,7 +218,15 @@ export const GameConnectionProvider = ({
   const sendDynamicUpdate = useCallback(
     (update: DynamicUpdate) => {
       const socket = socketRef.current;
-      if (!socket || connectionState !== "connected" || !roomCode) return;
+      if (
+        !socket ||
+        connectionState !== "connected" ||
+        !roomCode ||
+        !socket.readyState
+      )
+        return;
+      console.log("socket", socket);
+
       const wrapper = create(GameUpdateSchema, {
         matchId: roomCode,
         data: { case: "dynamicUpdate", value: update },
@@ -227,17 +236,26 @@ export const GameConnectionProvider = ({
       message.message.case = "gameUpdate";
       message.message.value = wrapper;
 
-      if (message.message.value.data.case === "dynamicUpdate") {
-        console.log(
-          "Sending dynamic update:",
-          message.message.value.data.value.hostPlayer
-        );
-      }
-
       socket.send(toBinary(ClientMessageSchema, message));
     },
     [roomCode, connectionState]
   );
+
+  const sendTurnUpdate = (update: TurnUpdate) => {
+    const socket = socketRef.current;
+    if (!socket || connectionState !== "connected" || !roomCode) return;
+
+    const finalUpdate = create(GameUpdateSchema, {
+      matchId: roomCode,
+      data: { case: "turnUpdate", value: update },
+    });
+
+    const message = create(ClientMessageSchema);
+    message.message.case = "gameUpdate";
+    message.message.value = finalUpdate;
+
+    socket.send(toBinary(ClientMessageSchema, message));
+  };
 
   const value: GameConnectionContextValue = {
     connectionState,
@@ -253,6 +271,7 @@ export const GameConnectionProvider = ({
     latestOpponentState,
     setLatestOpponentState,
     sendDynamicUpdate,
+    sendTurnUpdate,
     currentTurn,
     setCurrentTurn,
   };
