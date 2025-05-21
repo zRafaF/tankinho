@@ -132,8 +132,8 @@ class GameServer:
         match.guest_connection = websocket
 
         response = ServerMessage()
-        response.match_created.match_id = match_id
-        response.match_created.player_id = get_player_id()
+        response.match_joined.match_id = match_id
+        response.match_joined.player_id = get_player_id()
         await match.guest_connection.send(response.SerializeToString())
 
         success = ServerMessage()

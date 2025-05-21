@@ -83,12 +83,13 @@ export default function GameScreen({
 
   // Initialize game start
   useEffect(() => {
-    if (gameStarted && isHost) {
-      setRoundState("player");
+    if (gameStarted) {
+      setPlayerPos(isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS);
+      setRoundState(isHost ? "player" : "other");
       setTurnTime(TURN_TIME_SEC);
-      setCurrentTurn(Turn.HOST);
+      setCurrentTurn(Turn.HOST); // always start with host
     }
-  }, [gameStarted, isHost, setCurrentTurn]);
+  }, [gameStarted]);
 
   // Sync opponent state
   useEffect(() => {
@@ -146,12 +147,20 @@ export default function GameScreen({
       })
     );
 
+    const opponent = latestOpponentState
+      ? isHost
+        ? latestOpponentState.guestPlayer
+        : latestOpponentState.hostPlayer
+      : undefined;
+
     const dynamic = create(DynamicUpdateSchema, {
-      hostPlayer: isHost ? me : undefined,
-      guestPlayer: !isHost ? me : undefined,
+      hostPlayer: isHost ? me : opponent,
+      guestPlayer: !isHost ? me : opponent,
       bullets: bulletMessages,
       turn: currentTurn,
     });
+
+    console.log(isHost);
 
     sendDynamicUpdate(dynamic);
   };
@@ -160,7 +169,7 @@ export default function GameScreen({
     if (!isMyTurn || roundState === "other") return;
 
     sendUpdate();
-    const id = setInterval(sendUpdate, 300);
+    const id = setInterval(sendUpdate, 1000);
     return () => clearInterval(id);
   }, [isMyTurn, roundState, sendDynamicUpdate, currentTurn]);
 
@@ -196,7 +205,7 @@ export default function GameScreen({
       if (theirTurn === (isHost ? Turn.HOST : Turn.GUEST)) {
         setRoundState("player");
         setTurnTime(TURN_TIME_SEC);
-        setPlayerPos(isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS);
+        // setPlayerPos(isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS);
       }
     }
   }, [latestOpponentState, currentTurn, isHost, setCurrentTurn]);
