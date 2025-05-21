@@ -10,6 +10,7 @@ import {
   ENVIRONMENT_HEIGHT,
 } from "@/config/gameConfig";
 import { getEnvironmentBit } from "@/lib/environmentUtils";
+import { computeGroundY } from "@/lib/gameHelpers";
 
 interface PlayerProps {
   x: number;
@@ -117,25 +118,8 @@ function PlayerInner({
         }
       }
 
-      // Gravity (applied to all players)
-      const halfW = PLAYER_WIDTH / 2;
-      const colStart = Math.floor(newX - halfW);
-      const colEnd = Math.floor(newX + halfW - 0.001);
-      let groundRow = ENVIRONMENT_HEIGHT;
-      for (
-        let row = Math.ceil(oldY + PLAYER_HEIGHT / 2);
-        row < ENVIRONMENT_HEIGHT;
-        row++
-      ) {
-        if (
-          getEnvironmentBit(bitmask, colStart, row) ||
-          getEnvironmentBit(bitmask, colEnd, row)
-        ) {
-          groundRow = row;
-          break;
-        }
-      }
-      const newY = groundRow - PLAYER_HEIGHT / 2;
+      // Use the new computeGroundY function for gravity
+      const newY = computeGroundY(newX, oldY, bitmask);
 
       const newPos = { x: newX, y: newY };
       if (newPos.x !== posRef.current.x || newPos.y !== posRef.current.y) {

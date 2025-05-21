@@ -10,8 +10,6 @@ import {
   SHOOTING_POWER_INTERVAL_MS,
   TURN_TIME_SEC,
   BULLET_SPEED_FACTOR,
-  PLAYER_WIDTH,
-  PLAYER_HEIGHT,
 } from "@/config/gameConfig";
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
@@ -32,7 +30,6 @@ import {
   updateBulletPhysics,
 } from "@/lib/gameHelpers";
 import { Bullets, Explosions } from "./game/GameElements";
-import { getEnvironmentBit } from "@/lib/environmentUtils";
 
 export default function GameScreen({
   onExitGame,
