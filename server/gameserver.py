@@ -92,15 +92,13 @@ class GameServer:
             print(f"Match not found for game update: {game_update.match_id}")
             return
 
-        if game_update.dynamic_update:
+        if game_update.HasField("dynamic_update"):
             target_ws = (
                 match.guest_connection
                 if game_update.dynamic_update.turn == Turn.TURN_HOST
                 else match.host_connection
             )
-
-            print(f"Game update received: {game_update}")
-
+            print(f"Dynamic update received")
             if target_ws is not None:
                 response = ServerMessage()
                 response.game_update.dynamic_update.CopyFrom(game_update.dynamic_update)
@@ -109,10 +107,11 @@ class GameServer:
                 except websockets.exceptions.ConnectionClosed:
                     print("Failed to send update - connection closed")
                     await self.handle_connection_closed(target_ws)
-        elif game_update.turn_update:
+        elif game_update.HasField("turn_update"):
             response = ServerMessage()
             response.game_update.turn_update.CopyFrom(game_update.turn_update)
-            print(f"Turn update received: {game_update.turn_update}")
+            print(f"Turn update received")
+            print(f"Turn update bit mask: {game_update.turn_update}")
             try:
                 await match.host_connection.send(response.SerializeToString())
                 await match.guest_connection.send(response.SerializeToString())

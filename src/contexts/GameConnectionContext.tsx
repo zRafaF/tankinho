@@ -255,6 +255,8 @@ export const GameConnectionProvider = ({
     const socket = socketRef.current;
     if (!socket || connectionState !== "connected" || !roomCode) return;
 
+    console.log("Sending turn update", update);
+
     const finalUpdate = create(GameUpdateSchema, {
       matchId: roomCode,
       data: { case: "turnUpdate", value: update },

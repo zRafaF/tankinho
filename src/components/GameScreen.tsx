@@ -28,6 +28,7 @@ import {
 import type { Bullet, Explosion, RoundState } from "@/types/gameTypes";
 import {
   calculateExplosionEffects,
+  computeGroundY,
   updateBulletPhysics,
 } from "@/lib/gameHelpers";
 import { Bullets, Explosions } from "./game/GameElements";
@@ -178,25 +179,57 @@ export default function GameScreen({
 
   // Handle turn transitions when bullets are done
   useEffect(() => {
-    if (roundState === "bullet" && bullets.length === 0) {
-      sendUpdate();
-      const newTurn = isHost ? Turn.GUEST : Turn.HOST;
-      const update = create(TurnUpdateSchema, {
-        bitMask: bitmask,
-        turn: newTurn,
-      });
-      sendTurnUpdate(update);
-      setCurrentTurn(newTurn);
-      setRoundState("other");
-    }
-  }, [
-    roundState,
-    bullets.length,
-    bitmask,
-    isHost,
-    sendTurnUpdate,
-    setCurrentTurn,
-  ]);
+    if (roundState !== "bullet" || bullets.length > 0) return;
+
+    // 1) send one last DynamicUpdate with the NEW turn baked in
+    const {
+      playerPos,
+      turretAngle,
+      bullets: currentBullets,
+      health,
+      turnTime,
+    } = latestState.current;
+    const newTurn = isHost ? Turn.GUEST : Turn.HOST;
+
+    // marshal “me”
+    const me = create(PlayerSchema, {
+      position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
+      velocity: create(Vec2Schema, { x: 0, y: 0 }),
+      aimAngle: turretAngle,
+      health,
+      timeLeft: turnTime,
+    });
+    // opponent from last known state
+    const opponent = latestOpponentState
+      ? isHost
+        ? latestOpponentState.guestPlayer
+        : latestOpponentState.hostPlayer
+      : undefined;
+
+    const dynamic = create(DynamicUpdateSchema, {
+      hostPlayer: isHost ? me : opponent,
+      guestPlayer: !isHost ? me : opponent,
+      bullets: currentBullets.map((b) =>
+        create(BulletSchema, {
+          position: create(Vec2Schema, { x: b.x, y: b.y }),
+          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+        })
+      ),
+      turn: newTurn,
+    });
+    sendDynamicUpdate(dynamic);
+
+    // 2) now send the TurnUpdate with the up-to-date bitmask
+    const turnMsg = create(TurnUpdateSchema, {
+      bitMask: bitmask,
+      turn: newTurn,
+    });
+    sendTurnUpdate(turnMsg);
+
+    // 3) locally switch
+    setCurrentTurn(newTurn);
+    setRoundState("other");
+  }, [roundState, bullets.length, bitmask]);
 
   // Handle incoming turn updates
   useEffect(() => {
@@ -360,30 +393,19 @@ export default function GameScreen({
   };
 
   useEffect(() => {
-    // Apply gravity to opponent player on this client
-    const halfW = PLAYER_WIDTH / 2;
-    const colStart = Math.floor(opponentPos.x - halfW);
-    const colEnd = Math.floor(opponentPos.x + halfW - 0.001);
-
-    let groundRow = ENVIRONMENT_HEIGHT;
-    for (
-      let row = Math.ceil(opponentPos.y + PLAYER_HEIGHT / 2);
-      row < ENVIRONMENT_HEIGHT;
-      row++
-    ) {
-      if (
-        getEnvironmentBit(bitmask, colStart, row) ||
-        getEnvironmentBit(bitmask, colEnd, row)
-      ) {
-        groundRow = row;
-        break;
-      }
+    const myId = isHost ? Turn.HOST : Turn.GUEST;
+    if (currentTurn === myId) {
+      setRoundState("player");
+      setTurnTime(TURN_TIME_SEC);
     }
+  }, [currentTurn]);
 
-    const newY = groundRow - PLAYER_HEIGHT / 2;
-    if (newY !== opponentPos.y) {
-      setOpponentPos({ ...opponentPos, y: newY });
-    }
+  useEffect(() => {
+    // keep the remote tank grounded at all times
+    setOpponentPos((op) => ({
+      x: op.x,
+      y: computeGroundY(op.x, op.y, bitmask),
+    }));
   }, [opponentPos.x, opponentPos.y, bitmask]);
 
   return (

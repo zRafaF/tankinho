@@ -5,6 +5,8 @@ import {
   EXPLOSION_DAMAGE,
   ENVIRONMENT_WIDTH,
   ENVIRONMENT_HEIGHT,
+  PLAYER_WIDTH,
+  PLAYER_HEIGHT,
 } from "@/config/gameConfig";
 import { getEnvironmentBit, clearEnvironmentBit } from "@/lib/environmentUtils";
 import type { Bullet } from "@/types/gameTypes";
@@ -64,3 +66,36 @@ export const updateBulletPhysics = (
       return true;
     });
 };
+
+/**
+ * Given an x-position and the current terrain bitmask,
+ * returns the y so that the bottom of the tank
+ * rests on the first occupied pixel below.
+ */
+export function computeGroundY(
+  x: number,
+  yStart: number,
+  bitmask: Uint8Array
+): number {
+  const halfW = PLAYER_WIDTH / 2;
+  const colStart = Math.floor(x - halfW);
+  const colEnd = Math.floor(x + halfW - 0.001);
+
+  let groundRow = ENVIRONMENT_HEIGHT;
+  // scan from just below the tank's center downward
+  for (
+    let row = Math.ceil(yStart + PLAYER_HEIGHT / 2);
+    row < ENVIRONMENT_HEIGHT;
+    row++
+  ) {
+    if (
+      getEnvironmentBit(bitmask, colStart, row) ||
+      getEnvironmentBit(bitmask, colEnd, row)
+    ) {
+      groundRow = row;
+      break;
+    }
+  }
+  // return the y‐coordinate of the tank's center
+  return groundRow - PLAYER_HEIGHT / 2;
+}
