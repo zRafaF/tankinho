@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Stage, Layer } from "react-konva";
 import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 import {
@@ -38,7 +38,6 @@ export default function GameScreen({
   onExitGame: () => void;
   gameStarted: boolean;
 }) {
-  const [health, setHealth] = useState(100);
   const {
     roomCode,
     disconnectFromMatch,
@@ -51,48 +50,212 @@ export default function GameScreen({
     bitmask,
     setBitmask,
   } = useGameConnectionContext();
+
+  // Game state
+  const [health, setHealth] = useState(100);
   const [playerPos, setPlayerPos] = useState(
     isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS
   );
   const [turretAngle, setTurretAngle] = useState(0);
   const [roundState, setRoundState] = useState<RoundState>("other");
   const [turnTime, setTurnTime] = useState(TURN_TIME_SEC);
-
   const [isCharging, setIsCharging] = useState(false);
   const [powerBars, setPowerBars] = useState(1);
 
+  // Game elements
   const [bullets, setBullets] = useState<Bullet[]>([]);
-  const nextBulletId = useRef(1);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
+  const nextBulletId = useRef(1);
   const nextExplId = useRef(1);
   const explodedBullets = useRef<Set<number>>(new Set());
 
-  const [windowSize, setWindowSize] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
-
-  const stageRef = useRef<any>(null);
-  const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
-  const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
-
-  const isMyTurn = currentTurn === (isHost ? Turn.HOST : Turn.GUEST);
-
+  // Opponent state
   const [opponentPos, setOpponentPos] = useState(
     isHost ? INITIAL_GUEST_POS : INITIAL_PLAYER_POS
   );
   const [opponentAngle, setOpponentAngle] = useState(0);
   const [opponentHealth, setOpponentHealth] = useState(100);
 
-  // Initialize game start
+  // UI state
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
+  // Refs and context
+  const stageRef = useRef<any>(null);
+
+  const latestState = useRef({
+    playerPos,
+    turretAngle,
+    bullets,
+    health,
+    turnTime,
+    isHost,
+  });
+  // Derived values
+  const blockSize = windowSize.width / ENVIRONMENT_WIDTH;
+  const stageHeight = blockSize * ENVIRONMENT_HEIGHT;
+  const isMyTurn = currentTurn === (isHost ? Turn.HOST : Turn.GUEST);
+
+  /* ===== Helper Functions ===== */
+
+  const updateLatestState = useCallback(() => {
+    latestState.current = {
+      playerPos,
+      turretAngle,
+      bullets,
+      health,
+      turnTime,
+      isHost,
+    };
+  }, [playerPos, turretAngle, bullets, health, turnTime, isHost]);
+
+  const createPlayerSchema = useCallback(
+    (pos: { x: number; y: number }, angle: number, health: number) => {
+      return create(PlayerSchema, {
+        position: create(Vec2Schema, { x: pos.x, y: pos.y }),
+        velocity: create(Vec2Schema, { x: 0, y: 0 }),
+        aimAngle: angle,
+        health,
+        timeLeft: turnTime,
+      });
+    },
+    [turnTime]
+  );
+
+  const sendGameUpdate = useCallback(() => {
+    const { playerPos, turretAngle, bullets, health } = latestState.current;
+
+    const me = createPlayerSchema(playerPos, turretAngle, health);
+    const opponent = latestOpponentState
+      ? isHost
+        ? latestOpponentState.guestPlayer
+        : latestOpponentState.hostPlayer
+      : undefined;
+
+    const bulletMessages = bullets.map((b) =>
+      create(BulletSchema, {
+        position: create(Vec2Schema, { x: b.x, y: b.y }),
+        velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+      })
+    );
+
+    const dynamic = create(DynamicUpdateSchema, {
+      hostPlayer: isHost ? me : opponent,
+      guestPlayer: !isHost ? me : opponent,
+      bullets: bulletMessages,
+      turn: currentTurn,
+    });
+
+    sendDynamicUpdate(dynamic);
+  }, [
+    createPlayerSchema,
+    currentTurn,
+    isHost,
+    latestOpponentState,
+    sendDynamicUpdate,
+  ]);
+
+  const handleTurnTransition = useCallback(() => {
+    const newTurn = isHost ? Turn.GUEST : Turn.HOST;
+    const { playerPos, turretAngle, bullets, health } = latestState.current;
+
+    // Send final dynamic update
+    const me = createPlayerSchema(playerPos, turretAngle, health);
+    const opponent = latestOpponentState
+      ? isHost
+        ? latestOpponentState.guestPlayer
+        : latestOpponentState.hostPlayer
+      : undefined;
+
+    const dynamic = create(DynamicUpdateSchema, {
+      hostPlayer: isHost ? me : opponent,
+      guestPlayer: !isHost ? me : opponent,
+      bullets: bullets.map((b) =>
+        create(BulletSchema, {
+          position: create(Vec2Schema, { x: b.x, y: b.y }),
+          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+        })
+      ),
+      turn: newTurn,
+    });
+    sendDynamicUpdate(dynamic);
+
+    // Send turn update
+    const turnMsg = create(TurnUpdateSchema, {
+      bitMask: bitmask,
+      turn: newTurn,
+    });
+    sendTurnUpdate(turnMsg);
+
+    // Update local state
+    setCurrentTurn(newTurn);
+    setRoundState("other");
+  }, [
+    bitmask,
+    createPlayerSchema,
+    isHost,
+    latestOpponentState,
+    sendDynamicUpdate,
+    sendTurnUpdate,
+    setCurrentTurn,
+  ]);
+
+  const triggerExplosion = useCallback(
+    (bid: number, wx: number, wy: number) => {
+      if (explodedBullets.current.has(bid)) return;
+      explodedBullets.current.add(bid);
+
+      // Add explosion effect
+      const eid = nextExplId.current++;
+      setExplosions((es) => [...es, { id: eid, x: wx, y: wy }]);
+      setTimeout(() => {
+        setExplosions((es) => es.filter((e) => e.id !== eid));
+      }, 1000);
+
+      // Calculate explosion damage and terrain destruction
+      const { newBitmask, damage } = calculateExplosionEffects(
+        bitmask,
+        playerPos,
+        wx,
+        wy
+      );
+      setBitmask(newBitmask);
+      if (damage > 0) setHealth((h) => Math.max(0, h - damage));
+    },
+    [bitmask, playerPos, setBitmask]
+  );
+
+  const handleShoot = useCallback(() => {
+    if (roundState !== "player" || !isMyTurn) return;
+
+    const frac = powerBars / SHOOTING_POWER_BARS;
+    const speed = frac * BULLET_SPEED_FACTOR;
+    const vx = Math.cos(turretAngle) * speed;
+    const vy = Math.sin(turretAngle) * speed;
+    const id = nextBulletId.current++;
+
+    setBullets((bs) => [...bs, { id, x: playerPos.x, y: playerPos.y, vx, vy }]);
+    setRoundState("bullet");
+  }, [isMyTurn, playerPos, powerBars, roundState, turretAngle]);
+
+  const handleExit = useCallback(() => {
+    disconnectFromMatch();
+    onExitGame();
+  }, [disconnectFromMatch, onExitGame]);
+
+  /* ===== Effect Hooks ===== */
+
+  // Initialize game
   useEffect(() => {
     if (gameStarted) {
       setPlayerPos(isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS);
       setRoundState(isHost ? "player" : "other");
       setTurnTime(TURN_TIME_SEC);
-      setCurrentTurn(Turn.HOST); // always start with host
+      setCurrentTurn(Turn.HOST);
     }
-  }, [gameStarted]);
+  }, [gameStarted, isHost, setCurrentTurn]);
 
   // Sync opponent state
   useEffect(() => {
@@ -110,123 +273,25 @@ export default function GameScreen({
     }
   }, [latestOpponentState, isHost]);
 
-  // Dynamic updates
-  const latestState = useRef({
-    playerPos,
-    turretAngle,
-    bullets,
-    health,
-    turnTime,
-    isHost,
-  });
-
+  // Keep latestState ref updated
   useEffect(() => {
-    latestState.current = {
-      playerPos,
-      turretAngle,
-      bullets,
-      health,
-      turnTime,
-      isHost,
-    };
-  }, [playerPos, turretAngle, bullets, health, turnTime, isHost]);
+    updateLatestState();
+  }, [updateLatestState]);
 
-  const sendUpdate = () => {
-    const { playerPos, turretAngle, bullets, health, turnTime, isHost } =
-      latestState.current;
-
-    const me = create(PlayerSchema, {
-      position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
-      velocity: create(Vec2Schema, { x: 0, y: 0 }),
-      aimAngle: turretAngle,
-      health,
-      timeLeft: turnTime,
-    });
-
-    const bulletMessages = bullets.map((b) =>
-      create(BulletSchema, {
-        position: create(Vec2Schema, { x: b.x, y: b.y }),
-        velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
-      })
-    );
-
-    const opponent = latestOpponentState
-      ? isHost
-        ? latestOpponentState.guestPlayer
-        : latestOpponentState.hostPlayer
-      : undefined;
-
-    const dynamic = create(DynamicUpdateSchema, {
-      hostPlayer: isHost ? me : opponent,
-      guestPlayer: !isHost ? me : opponent,
-      bullets: bulletMessages,
-      turn: currentTurn,
-    });
-
-    sendDynamicUpdate(dynamic);
-  };
-
+  // Send periodic game updates during my turn
   useEffect(() => {
     if (!isMyTurn || roundState === "other") return;
 
-    sendUpdate();
-    const id = setInterval(sendUpdate, 1000);
+    sendGameUpdate();
+    const id = setInterval(sendGameUpdate, 1000);
     return () => clearInterval(id);
-  }, [isMyTurn, roundState, sendDynamicUpdate, currentTurn]);
+  }, [isMyTurn, roundState, sendGameUpdate]);
 
   // Handle turn transitions when bullets are done
   useEffect(() => {
     if (roundState !== "bullet" || bullets.length > 0) return;
-
-    // 1) send one last DynamicUpdate with the NEW turn baked in
-    const {
-      playerPos,
-      turretAngle,
-      bullets: currentBullets,
-      health,
-      turnTime,
-    } = latestState.current;
-    const newTurn = isHost ? Turn.GUEST : Turn.HOST;
-
-    // marshal “me”
-    const me = create(PlayerSchema, {
-      position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
-      velocity: create(Vec2Schema, { x: 0, y: 0 }),
-      aimAngle: turretAngle,
-      health,
-      timeLeft: turnTime,
-    });
-    // opponent from last known state
-    const opponent = latestOpponentState
-      ? isHost
-        ? latestOpponentState.guestPlayer
-        : latestOpponentState.hostPlayer
-      : undefined;
-
-    const dynamic = create(DynamicUpdateSchema, {
-      hostPlayer: isHost ? me : opponent,
-      guestPlayer: !isHost ? me : opponent,
-      bullets: currentBullets.map((b) =>
-        create(BulletSchema, {
-          position: create(Vec2Schema, { x: b.x, y: b.y }),
-          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
-        })
-      ),
-      turn: newTurn,
-    });
-    sendDynamicUpdate(dynamic);
-
-    // 2) now send the TurnUpdate with the up-to-date bitmask
-    const turnMsg = create(TurnUpdateSchema, {
-      bitMask: bitmask,
-      turn: newTurn,
-    });
-    sendTurnUpdate(turnMsg);
-
-    // 3) locally switch
-    setCurrentTurn(newTurn);
-    setRoundState("other");
-  }, [roundState, bullets.length, bitmask]);
+    handleTurnTransition();
+  }, [roundState, bullets.length, handleTurnTransition]);
 
   // Handle incoming turn updates
   useEffect(() => {
@@ -278,6 +343,7 @@ export default function GameScreen({
   // Mouse movement for aiming
   useEffect(() => {
     if (roundState !== "player" || !isMyTurn) return;
+
     const onMove = (e: MouseEvent) => {
       if (!stageRef.current) return;
       const rect = stageRef.current.container().getBoundingClientRect();
@@ -285,6 +351,7 @@ export default function GameScreen({
       const wy = (e.clientY - rect.top) / blockSize;
       setTurretAngle(Math.atan2(wy - playerPos.y, wx - playerPos.x));
     };
+
     window.addEventListener("mousemove", onMove);
     return () => window.removeEventListener("mousemove", onMove);
   }, [roundState, playerPos, blockSize, isMyTurn]);
@@ -298,29 +365,22 @@ export default function GameScreen({
         setPowerBars(1);
       }
     };
+
     const onUp = (e: KeyboardEvent) => {
-      if (roundState !== "player" || !isMyTurn) return;
-      if (e.code === "Space" && isCharging) {
+      if (roundState !== "player" || !isMyTurn || !isCharging) return;
+      if (e.code === "Space") {
         setIsCharging(false);
-        const frac = powerBars / SHOOTING_POWER_BARS;
-        const speed = frac * BULLET_SPEED_FACTOR;
-        const vx = Math.cos(turretAngle) * speed;
-        const vy = Math.sin(turretAngle) * speed;
-        const id = nextBulletId.current++;
-        setBullets((bs) => [
-          ...bs,
-          { id, x: playerPos.x, y: playerPos.y, vx, vy },
-        ]);
-        setRoundState("bullet");
+        handleShoot();
       }
     };
+
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
     return () => {
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
     };
-  }, [roundState, isCharging, powerBars, turretAngle, playerPos, isMyTurn]);
+  }, [roundState, isCharging, isMyTurn, handleShoot]);
 
   // Power charging
   useEffect(() => {
@@ -348,7 +408,7 @@ export default function GameScreen({
 
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [roundState, bitmask]);
+  }, [roundState, bitmask, triggerExplosion]);
 
   // Check for game over
   useEffect(() => {
@@ -364,41 +424,8 @@ export default function GameScreen({
     }
   }, [health, bitmask, isHost, sendTurnUpdate, setCurrentTurn]);
 
-  const triggerExplosion = (bid: number, wx: number, wy: number) => {
-    if (explodedBullets.current.has(bid)) return;
-    explodedBullets.current.add(bid);
-
-    const eid = nextExplId.current++;
-    setExplosions((es) => [...es, { id: eid, x: wx, y: wy }]);
-    setTimeout(() => {
-      setExplosions((es) => es.filter((e) => e.id !== eid));
-    }, 1000);
-
-    const { newBitmask, damage } = calculateExplosionEffects(
-      bitmask,
-      playerPos,
-      wx,
-      wy
-    );
-    setBitmask(newBitmask);
-    if (damage > 0) setHealth((h) => Math.max(0, h - damage));
-  };
-
-  const handleExit = () => {
-    disconnectFromMatch();
-    onExitGame();
-  };
-
+  // Keep the remote tank grounded
   useEffect(() => {
-    const myId = isHost ? Turn.HOST : Turn.GUEST;
-    if (currentTurn === myId) {
-      setRoundState("player");
-      setTurnTime(TURN_TIME_SEC);
-    }
-  }, [currentTurn]);
-
-  useEffect(() => {
-    // keep the remote tank grounded at all times
     setOpponentPos((op) => ({
       x: op.x,
       y: computeGroundY(op.x, op.y, bitmask),

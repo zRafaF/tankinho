@@ -7,7 +7,6 @@ import {
   PLAYER_SPEED,
   PLAYER_MAX_STEP_OVER,
   ENVIRONMENT_WIDTH,
-  ENVIRONMENT_HEIGHT,
 } from "@/config/gameConfig";
 import { getEnvironmentBit } from "@/lib/environmentUtils";
 import { computeGroundY } from "@/lib/gameHelpers";
