@@ -142,7 +142,7 @@ function PlayerInner({
 
   const pw = PLAYER_WIDTH * blockSize;
   const ph = PLAYER_HEIGHT * blockSize;
-  const turretLen = 2 * blockSize;
+  const turretLen = 1.5 * blockSize;
   const turretW = 0.3 * blockSize;
 
   return (
@@ -153,7 +153,7 @@ function PlayerInner({
           y={-turretW / 2}
           width={turretLen}
           height={turretW}
-          fill="#333"
+          fill="#777"
           cornerRadius={blockSize * 0.05}
         />
       </Group>

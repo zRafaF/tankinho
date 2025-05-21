@@ -10,6 +10,7 @@ import {
   SHOOTING_POWER_INTERVAL_MS,
   TURN_TIME_SEC,
   BULLET_SPEED_FACTOR,
+  DYNAMIC_UPDATE_INTERVAL_MS,
 } from "@/config/gameConfig";
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
@@ -170,7 +171,7 @@ export default function GameScreen({
     if (!isMyTurn || roundState === "other") return;
 
     sendUpdate();
-    const id = setInterval(sendUpdate, 1000);
+    const id = setInterval(sendUpdate, DYNAMIC_UPDATE_INTERVAL_MS);
     return () => clearInterval(id);
   }, [isMyTurn, roundState, sendDynamicUpdate, currentTurn]);
 
@@ -411,7 +412,7 @@ export default function GameScreen({
         ref={stageRef}
         width={windowSize.width}
         height={stageHeight}
-        className="absolute top-1/2 left-0 transform -translate-y-1/2"
+        className="absolute top-1/2 left-0 transform -translate-y-1/2 border-y"
       >
         <Environment bitmask={bitmask} blockSize={blockSize} />
         <Layer>

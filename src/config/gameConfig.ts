@@ -26,3 +26,5 @@ export const BULLET_SPEED_FACTOR = 40; // scales powerBars → initial speed
 
 export const EXPLOSION_RADIUS = 2; // in blocks
 export const EXPLOSION_DAMAGE = 35; // health points
+
+export const DYNAMIC_UPDATE_INTERVAL_MS = 300; // how often (ms) the game state is updated
