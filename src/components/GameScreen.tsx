@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Stage, Layer, Circle, Ellipse } from "react-konva";
+import { Stage, Layer } from "react-konva";
 import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 import {
   ENVIRONMENT_WIDTH,
@@ -9,16 +9,8 @@ import {
   SHOOTING_POWER_BARS,
   SHOOTING_POWER_INTERVAL_MS,
   TURN_TIME_SEC,
-  BULLET_GRAVITY,
   BULLET_SPEED_FACTOR,
-  EXPLOSION_RADIUS,
-  EXPLOSION_DAMAGE,
 } from "@/config/gameConfig";
-import {
-  createTerrain,
-  getEnvironmentBit,
-  clearEnvironmentBit,
-} from "@/lib/environmentUtils";
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
 import { GameUI } from "@/components/game/GameUI";
@@ -31,22 +23,12 @@ import {
   TurnUpdateSchema,
   Vec2Schema,
 } from "@/gen/proto/game_pb";
-
-interface Bullet {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-}
-
-interface Explosion {
-  id: number;
-  x: number;
-  y: number;
-}
-
-type RoundState = "player" | "bullet" | "other";
+import type { Bullet, Explosion, RoundState } from "@/types/gameTypes";
+import {
+  calculateExplosionEffects,
+  updateBulletPhysics,
+} from "@/lib/gameHelpers";
+import { Bullets, Explosions } from "./game/GameElements";
 
 export default function GameScreen({
   onExitGame,
@@ -313,36 +295,16 @@ export default function GameScreen({
     if (roundState !== "bullet") return;
     let raf = 0;
     let last = performance.now();
+
     const step = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
       setBullets((list) =>
-        list
-          .map((b) => {
-            const nvy = b.vy + BULLET_GRAVITY * dt;
-            return { ...b, x: b.x + b.vx * dt, y: b.y + nvy * dt, vy: nvy };
-          })
-          .filter((b) => {
-            if (
-              b.x < 0 ||
-              b.x > ENVIRONMENT_WIDTH ||
-              b.y < 0 ||
-              b.y > ENVIRONMENT_HEIGHT
-            ) {
-              triggerExplosion(b.id, b.x, b.y);
-              return false;
-            }
-            const tx = Math.floor(b.x),
-              ty = Math.floor(b.y);
-            if (getEnvironmentBit(bitmask, tx, ty)) {
-              triggerExplosion(b.id, b.x, b.y);
-              return false;
-            }
-            return true;
-          })
+        updateBulletPhysics(list, bitmask, dt, triggerExplosion)
       );
       raf = requestAnimationFrame(step);
     };
+
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [roundState, bitmask]);
@@ -371,22 +333,14 @@ export default function GameScreen({
       setExplosions((es) => es.filter((e) => e.id !== eid));
     }, 1000);
 
-    const cx = Math.floor(wx),
-      cy = Math.floor(wy);
-    const newMask = Uint8Array.from(bitmask);
-    for (let dx = -EXPLOSION_RADIUS; dx <= EXPLOSION_RADIUS; dx++) {
-      for (let dy = -EXPLOSION_RADIUS; dy <= EXPLOSION_RADIUS; dy++) {
-        if (dx * dx + dy * dy <= EXPLOSION_RADIUS * EXPLOSION_RADIUS) {
-          clearEnvironmentBit(newMask, cx + dx, cy + dy);
-        }
-      }
-    }
-    setBitmask(newMask);
-
-    const dist2 = (playerPos.x - wx) ** 2 + (playerPos.y - wy) ** 2;
-    if (dist2 <= EXPLOSION_RADIUS * EXPLOSION_RADIUS) {
-      setHealth((h) => Math.max(0, h - EXPLOSION_DAMAGE));
-    }
+    const { newBitmask, damage } = calculateExplosionEffects(
+      bitmask,
+      playerPos,
+      wx,
+      wy
+    );
+    setBitmask(newBitmask);
+    if (damage > 0) setHealth((h) => Math.max(0, h - damage));
   };
 
   const handleExit = () => {
@@ -425,25 +379,8 @@ export default function GameScreen({
             isTurnActive={false}
             isLocalPlayer={false}
           />
-          {bullets.map((b) => (
-            <Circle
-              key={b.id}
-              x={b.x * blockSize}
-              y={b.y * blockSize}
-              radius={blockSize * 0.2}
-              fill="yellow"
-            />
-          ))}
-          {explosions.map((e) => (
-            <Ellipse
-              key={e.id}
-              x={e.x * blockSize}
-              y={e.y * blockSize}
-              radiusX={EXPLOSION_RADIUS * blockSize}
-              radiusY={EXPLOSION_RADIUS * blockSize}
-              fill="rgba(255,165,0,0.5)"
-            />
-          ))}
+          <Bullets bullets={bullets} blockSize={blockSize} />
+          <Explosions explosions={explosions} blockSize={blockSize} />
         </Layer>
       </Stage>
       <GameUI

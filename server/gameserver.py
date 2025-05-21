@@ -95,6 +95,8 @@ class GameServer:
                     else match.host_connection
                 )
 
+                print(f"Game update received: {game_update}")
+
                 if target_ws is not None:
                     response = ServerMessage()
                     response.game_update.dynamic_update.CopyFrom(
