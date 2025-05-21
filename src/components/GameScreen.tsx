@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Stage, Layer } from "react-konva";
 import { useGameConnectionContext } from "@/contexts/GameConnectionContext";
 import {
@@ -62,6 +62,7 @@ export default function GameScreen({
   const [isCharging, setIsCharging] = useState(false);
   const [powerBars, setPowerBars] = useState(1);
 
+  const [opponentBullets, setOpponentBullets] = useState<Bullet[]>([]);
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const nextBulletId = useRef(1);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
@@ -110,6 +111,18 @@ export default function GameScreen({
       setOpponentHealth(opponentPlayer.health ?? 100);
     }
   }, [latestOpponentState, isHost]);
+
+  useEffect(() => {
+    if (!latestOpponentState?.bullets) return;
+    const obs: Bullet[] = latestOpponentState.bullets.map((b, idx) => ({
+      id: idx,
+      x: b.position?.x ?? 0,
+      y: b.position?.y ?? 0,
+      vx: b.velocity?.x ?? 0,
+      vy: b.velocity?.y ?? 0,
+    }));
+    setOpponentBullets(obs);
+  }, [latestOpponentState]);
 
   // Dynamic updates
   const latestState = useRef({
@@ -166,6 +179,65 @@ export default function GameScreen({
 
     sendDynamicUpdate(dynamic);
   };
+
+  // --- helper to send both DynamicUpdate + TurnUpdate + local switch ---
+  const endTurn = useCallback(() => {
+    const newTurn = isHost ? Turn.GUEST : Turn.HOST;
+
+    // marshal “me”
+    const {
+      playerPos,
+      turretAngle,
+      bullets: currentB,
+      health,
+      turnTime,
+    } = latestState.current;
+    const me = create(PlayerSchema, {
+      position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
+      velocity: create(Vec2Schema, { x: 0, y: 0 }),
+      aimAngle: turretAngle,
+      health,
+      timeLeft: turnTime,
+    });
+
+    const opponent = latestOpponentState
+      ? isHost
+        ? latestOpponentState.guestPlayer
+        : latestOpponentState.hostPlayer
+      : undefined;
+
+    // 1) send final DynamicUpdate
+    const dynamic = create(DynamicUpdateSchema, {
+      hostPlayer: isHost ? me : opponent,
+      guestPlayer: !isHost ? me : opponent,
+      bullets: currentB.map((b) =>
+        create(BulletSchema, {
+          position: create(Vec2Schema, { x: b.x, y: b.y }),
+          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+        })
+      ),
+      turn: newTurn,
+    });
+    sendDynamicUpdate(dynamic);
+
+    // 2) send TurnUpdate using the latest bitmaskRef
+    const turnMsg = create(TurnUpdateSchema, {
+      bitMask: bitmask,
+      turn: newTurn,
+    });
+    sendTurnUpdate(turnMsg);
+
+    // 3) switch locally
+    setCurrentTurn(newTurn);
+    setRoundState("other");
+  }, [
+    isHost,
+    latestOpponentState,
+    sendDynamicUpdate,
+    sendTurnUpdate,
+    setCurrentTurn,
+    setRoundState,
+  ]);
 
   useEffect(() => {
     if (!isMyTurn || roundState === "other") return;
@@ -243,38 +315,30 @@ export default function GameScreen({
     }
   }, [latestOpponentState, currentTurn, isHost, setCurrentTurn]);
 
-  // Turn timer
+  // Turn timer (now truly counts down and ends your turn)
   useEffect(() => {
     if (roundState !== "player") return;
 
     let animationFrameId: number;
-    let startTime = Date.now();
+    const startTime = Date.now();
 
-    const updateTimer = () => {
+    const tick = () => {
       const elapsed = Date.now() - startTime;
       const remaining = TURN_TIME_SEC - Math.floor(elapsed / 1000);
 
       if (remaining <= 0) {
         setTurnTime(0);
-        setRoundState("other");
+        endTurn(); // send updates, swap turns
         return;
       }
 
       setTurnTime(remaining);
-      animationFrameId = requestAnimationFrame(updateTimer);
+      animationFrameId = requestAnimationFrame(tick);
     };
 
-    animationFrameId = requestAnimationFrame(updateTimer);
+    animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [roundState]);
-
-  // Window resize handler
-  useEffect(() => {
-    const onResize = () =>
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  }, [roundState]); // endTurn is stable via useCallback
 
   // Mouse movement for aiming
   useEffect(() => {
@@ -381,7 +445,10 @@ export default function GameScreen({
       wx,
       wy
     );
+
     setBitmask(newBitmask);
+
+    setBullets((bs) => bs.filter((b) => b.id !== bid));
     if (damage > 0) setHealth((h) => Math.max(0, h - damage));
   };
 
@@ -437,7 +504,10 @@ export default function GameScreen({
             isTurnActive={false}
             isLocalPlayer={false}
           />
-          <Bullets bullets={bullets} blockSize={blockSize} />
+          <Bullets
+            bullets={[...bullets, ...opponentBullets]}
+            blockSize={blockSize}
+          />
           <Explosions explosions={explosions} blockSize={blockSize} />
         </Layer>
       </Stage>
