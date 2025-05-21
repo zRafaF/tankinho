@@ -38,7 +38,12 @@ function PlayerInner({
   const [movingLeft, setMovingLeft] = React.useState(false);
   const [movingRight, setMovingRight] = React.useState(false);
 
-  // Movement logic only for local player
+  // Sync ref to prop updates
+  useEffect(() => {
+    posRef.current = { x, y };
+  }, [x, y]);
+
+  // Handle input for local player
   useEffect(() => {
     if (!isLocalPlayer) return;
 
@@ -60,55 +65,60 @@ function PlayerInner({
     };
   }, [isTurnActive, isLocalPlayer]);
 
+  // Physics loop (movement + gravity or just gravity)
   useEffect(() => {
-    if (!isLocalPlayer || !onPositionChange) return;
+    if (!onPositionChange) return;
+
     let rafId: number;
     let lastTime = performance.now();
 
     const loop = (time: number) => {
-      if (!isTurnActive) {
-        rafId = requestAnimationFrame(loop);
-        return;
-      }
       const dt = (time - lastTime) / 1000;
       lastTime = time;
 
       let { x: oldX, y: oldY } = posRef.current;
-      let vx = 0;
-      if (movingLeft) vx -= PLAYER_SPEED;
-      if (movingRight) vx += PLAYER_SPEED;
-      let newX = oldX + vx * dt;
+      let newX = oldX;
 
-      newX = Math.max(
-        PLAYER_WIDTH / 2,
-        Math.min(newX, ENVIRONMENT_WIDTH - PLAYER_WIDTH / 2)
-      );
+      // Local player movement
+      if (isLocalPlayer && isTurnActive) {
+        let vx = 0;
+        if (movingLeft) vx -= PLAYER_SPEED;
+        if (movingRight) vx += PLAYER_SPEED;
+        newX = oldX + vx * dt;
 
-      const halfW = PLAYER_WIDTH / 2;
-      const dir = vx > 0 ? 1 : vx < 0 ? -1 : 0;
-      if (dir !== 0) {
-        const aheadCol =
-          dir > 0
-            ? Math.floor(newX + halfW - 0.001)
-            : Math.floor(newX - halfW + 0.001);
-        const footRow = Math.floor(oldY + PLAYER_HEIGHT / 2);
+        newX = Math.max(
+          PLAYER_WIDTH / 2,
+          Math.min(newX, ENVIRONMENT_WIDTH - PLAYER_WIDTH / 2)
+        );
 
-        if (getEnvironmentBit(bitmask, aheadCol, footRow)) {
-          let wallH = 1;
-          while (
-            wallH <= PLAYER_MAX_STEP_OVER &&
-            getEnvironmentBit(bitmask, aheadCol, footRow - wallH)
-          ) {
-            wallH++;
-          }
-          if (wallH <= PLAYER_MAX_STEP_OVER) {
-            oldY -= wallH;
-          } else {
-            newX = dir > 0 ? aheadCol - halfW : aheadCol + 1 + halfW;
+        const halfW = PLAYER_WIDTH / 2;
+        const dir = vx > 0 ? 1 : vx < 0 ? -1 : 0;
+        if (dir !== 0) {
+          const aheadCol =
+            dir > 0
+              ? Math.floor(newX + halfW - 0.001)
+              : Math.floor(newX - halfW + 0.001);
+          const footRow = Math.floor(oldY + PLAYER_HEIGHT / 2);
+
+          if (getEnvironmentBit(bitmask, aheadCol, footRow)) {
+            let wallH = 1;
+            while (
+              wallH <= PLAYER_MAX_STEP_OVER &&
+              getEnvironmentBit(bitmask, aheadCol, footRow - wallH)
+            ) {
+              wallH++;
+            }
+            if (wallH <= PLAYER_MAX_STEP_OVER) {
+              oldY -= wallH;
+            } else {
+              newX = dir > 0 ? aheadCol - halfW : aheadCol + 1 + halfW;
+            }
           }
         }
       }
 
+      // Gravity (applied to all players)
+      const halfW = PLAYER_WIDTH / 2;
       const colStart = Math.floor(newX - halfW);
       const colEnd = Math.floor(newX + halfW - 0.001);
       let groundRow = ENVIRONMENT_HEIGHT;

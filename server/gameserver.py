@@ -86,29 +86,39 @@ class GameServer:
     async def handle_game_update(
         self, websocket: websockets.ServerConnection, game_update: GameUpdate
     ):
+        match = self.matches.get(game_update.match_id)
+
+        if match is None:
+            print(f"Match not found for game update: {game_update.match_id}")
+            return
+
         if game_update.dynamic_update:
-            match = self.matches.get(game_update.match_id)
-            if match is not None:
-                target_ws = (
-                    match.guest_connection
-                    if game_update.dynamic_update.turn == Turn.TURN_HOST
-                    else match.host_connection
-                )
+            target_ws = (
+                match.guest_connection
+                if game_update.dynamic_update.turn == Turn.TURN_HOST
+                else match.host_connection
+            )
 
-                print(f"Game update received: {game_update}")
+            print(f"Game update received: {game_update}")
 
-                if target_ws is not None:
-                    response = ServerMessage()
-                    response.game_update.dynamic_update.CopyFrom(
-                        game_update.dynamic_update
-                    )
-                    try:
-                        await target_ws.send(response.SerializeToString())
-                    except websockets.exceptions.ConnectionClosed:
-                        print("Failed to send update - connection closed")
-                        await self.handle_connection_closed(target_ws)
+            if target_ws is not None:
+                response = ServerMessage()
+                response.game_update.dynamic_update.CopyFrom(game_update.dynamic_update)
+                try:
+                    await target_ws.send(response.SerializeToString())
+                except websockets.exceptions.ConnectionClosed:
+                    print("Failed to send update - connection closed")
+                    await self.handle_connection_closed(target_ws)
         elif game_update.turn_update:
-            print(f"turn: {game_update}")
+            response = ServerMessage()
+            response.game_update.turn_update.CopyFrom(game_update.turn_update)
+            print(f"Turn update received: {game_update.turn_update}")
+            try:
+                await match.host_connection.send(response.SerializeToString())
+                await match.guest_connection.send(response.SerializeToString())
+            except websockets.exceptions.ConnectionClosed:
+                print("Failed to send update - connection closed")
+                await self.handle_connection_closed(target_ws)
 
     async def handle_join_match(
         self, websocket: websockets.ServerConnection, match_id: str

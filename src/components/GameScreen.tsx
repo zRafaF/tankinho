@@ -10,6 +10,8 @@ import {
   SHOOTING_POWER_INTERVAL_MS,
   TURN_TIME_SEC,
   BULLET_SPEED_FACTOR,
+  PLAYER_WIDTH,
+  PLAYER_HEIGHT,
 } from "@/config/gameConfig";
 import { Environment } from "@/components/game/Environment";
 import { Player } from "@/components/game/Player";
@@ -29,6 +31,7 @@ import {
   updateBulletPhysics,
 } from "@/lib/gameHelpers";
 import { Bullets, Explosions } from "./game/GameElements";
+import { getEnvironmentBit } from "@/lib/environmentUtils";
 
 export default function GameScreen({
   onExitGame,
@@ -77,7 +80,9 @@ export default function GameScreen({
 
   const isMyTurn = currentTurn === (isHost ? Turn.HOST : Turn.GUEST);
 
-  const [opponentPos, setOpponentPos] = useState({ x: 0, y: 0 });
+  const [opponentPos, setOpponentPos] = useState(
+    isHost ? INITIAL_GUEST_POS : INITIAL_PLAYER_POS
+  );
   const [opponentAngle, setOpponentAngle] = useState(0);
   const [opponentHealth, setOpponentHealth] = useState(100);
 
@@ -160,8 +165,6 @@ export default function GameScreen({
       turn: currentTurn,
     });
 
-    console.log(isHost);
-
     sendDynamicUpdate(dynamic);
   };
 
@@ -205,7 +208,6 @@ export default function GameScreen({
       if (theirTurn === (isHost ? Turn.HOST : Turn.GUEST)) {
         setRoundState("player");
         setTurnTime(TURN_TIME_SEC);
-        // setPlayerPos(isHost ? INITIAL_PLAYER_POS : INITIAL_GUEST_POS);
       }
     }
   }, [latestOpponentState, currentTurn, isHost, setCurrentTurn]);
@@ -356,6 +358,33 @@ export default function GameScreen({
     disconnectFromMatch();
     onExitGame();
   };
+
+  useEffect(() => {
+    // Apply gravity to opponent player on this client
+    const halfW = PLAYER_WIDTH / 2;
+    const colStart = Math.floor(opponentPos.x - halfW);
+    const colEnd = Math.floor(opponentPos.x + halfW - 0.001);
+
+    let groundRow = ENVIRONMENT_HEIGHT;
+    for (
+      let row = Math.ceil(opponentPos.y + PLAYER_HEIGHT / 2);
+      row < ENVIRONMENT_HEIGHT;
+      row++
+    ) {
+      if (
+        getEnvironmentBit(bitmask, colStart, row) ||
+        getEnvironmentBit(bitmask, colEnd, row)
+      ) {
+        groundRow = row;
+        break;
+      }
+    }
+
+    const newY = groundRow - PLAYER_HEIGHT / 2;
+    if (newY !== opponentPos.y) {
+      setOpponentPos({ ...opponentPos, y: newY });
+    }
+  }, [opponentPos.x, opponentPos.y, bitmask]);
 
   return (
     <div className="relative w-full h-screen bg-gray-900 overflow-hidden">

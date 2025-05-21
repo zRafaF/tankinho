@@ -163,6 +163,9 @@ export const GameConnectionProvider = ({
                   break;
                 case "turnUpdate":
                   const turnUpdate = gameUpdate.data.value;
+
+                  console.log(turnUpdate);
+
                   setCurrentTurn(turnUpdate.turn);
                   setBitmask(turnUpdate.bitMask);
                   break;
