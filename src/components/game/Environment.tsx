@@ -97,7 +97,7 @@ export const Environment = React.memo(function Environment({
                 height={blockSize}
                 fill={fillColor}
                 stroke={activeScheme.stroke}
-                strokeWidth={Math.max(1, blockSize / 20)}
+                strokeWidth={Math.max(1, blockSize / 40)}
               />
             );
           }
