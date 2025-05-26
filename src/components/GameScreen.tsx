@@ -261,6 +261,57 @@ export default function GameScreen({
     setRoundState("other");
   };
 
+  const skipTurn = useCallback(() => {
+    if (roundState !== "player" || !isMyTurn) return;
+    const { playerPos, turretAngle, bullets, health, turnTime } =
+      latestState.current;
+    const me = create(PlayerSchema, {
+      position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
+      velocity: create(Vec2Schema, { x: 0, y: 0 }),
+      aimAngle: turretAngle,
+      health,
+      timeLeft: turnTime,
+    });
+    const opponent = latestOpponentState
+      ? isHost
+        ? latestOpponentState.guestPlayer
+        : latestOpponentState.hostPlayer
+      : undefined;
+    if (opponent) {
+      opponent.health = opponentHealth;
+    }
+
+    const dynamic = create(DynamicUpdateSchema, {
+      hostPlayer: isHost ? me : opponent,
+      guestPlayer: !isHost ? me : opponent,
+      bullets: bullets.map((b) =>
+        create(BulletSchema, {
+          position: create(Vec2Schema, { x: b.x, y: b.y }),
+          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+        })
+      ),
+      turn: isHost ? Turn.GUEST : Turn.HOST,
+    });
+
+    const turnMsg = create(TurnUpdateSchema, {
+      bitMask: bitmask,
+      dynamicUpdate: dynamic,
+    });
+    sendTurnUpdate(turnMsg);
+    setCurrentTurn(isHost ? Turn.GUEST : Turn.HOST);
+    setRoundState("other");
+  }, [
+    roundState,
+    isMyTurn,
+    latestState,
+    latestOpponentState,
+    isHost,
+    bitmask,
+    opponentHealth,
+    sendTurnUpdate,
+    setCurrentTurn,
+  ]);
+
   useEffect(() => {
     if (!isMyTurn || roundState === "other") return;
 
@@ -627,6 +678,7 @@ export default function GameScreen({
         powerBars={powerBars}
         isCharging={isCharging}
         isMyTurn={isMyTurn}
+        onSkipTurn={skipTurn}
       />
     </div>
   );
