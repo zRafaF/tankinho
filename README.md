@@ -5,23 +5,22 @@
 
 ---
 
-## 🎯 Visão Geral
+## Visão Geral
 
 Tankinho é um duelo de artilharia 2D por turnos, jogado no navegador, com terreno totalmente destrutível. Cada jogador alterna disparos, destruindo obstáculos e modificando o campo de batalha. Inspirado em clássicos como *Worms* e *ShellShock*.
 
 ---
 
-## ✨ Principais Funcionalidades
+## Principais Funcionalidades
 
 * **1v1 Online**: Enfrente amigos ou oponentes aleatórios.
 * **Terreno Dinâmico**: Destruição em tempo real usando sistema de bitmask.
-* **Física Realista**: Trajetória de projéteis influenciada por gravidade e vento.
+* **Física**: Trajetória de projéteis influenciada por gravidade.
 * **Sincronização por Turno**: Modelo de confiança simples que garante jogo fluido.
-* **Compatível com Qualquer Navegador**: Acesse de desktop ou dispositivo móvel.
 
 ---
 
-## 🛠 Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 | Componente   | Tecnologia                |
 | ------------ | ------------------------- |
@@ -33,18 +32,18 @@ Tankinho é um duelo de artilharia 2D por turnos, jogado no navegador, com terre
 | Implantação  | Docker + Nginx            |
 
 ---
-### 🌍 Environment Space
+### Environment Space
 - Representa o **mundo lógico do jogo**, medido em blocos.
 - Cada bloco é uma célula em uma matriz fixa (`WIDTH x HEIGHT`).
 - Toda a lógica de movimentação, colisão, explosão e alteração de terreno ocorre nesse espaço.
 - Exemplo: `(x=25, y=5)` significa a 25ª coluna e 5ª linha do mundo.
 
-### 🖥️ Screen Space
+### Screen Space
 - Representa o **espaço em pixels na tela**, usado para renderizar objetos no canvas.
 - Cada bloco do *environment* equivale a `BASE_BLOCK_SIZE` pixels no *screen space*.
 - O React-Konva faz a conversão automática entre os dois espaços.
 
-### 🔁 Relação entre os Espaços
+### Relação entre os Espaços
 
 ```plaintext
 screen_x = env_x * BASE_BLOCK_SIZE
@@ -55,25 +54,24 @@ screen_y = env_y * BASE_BLOCK_SIZE
 
 ---
 
-## 🧨 Terreno Destrutível com Bitmask
+## Terreno Destrutível com Bitmask
 
 Para garantir alta performance e sincronização eficiente, o terreno é representado como uma **máscara de bits** (`bitmask`):
 
 * Cada bit representa uma célula: `1` indica **chão**; `0` indica **ar**.
-* O terreno completo é uma matriz comprimida em bytes para transmissão rápida.
-* Durante explosões, o jogo recalcula os blocos afetados e envia apenas o *delta* da bitmask.
+* O terreno completo é um vetor de uma dimensão comprimido em bytes para transmissão rápida.
+* Durante explosões, o jogo recalcula o novo terreno e o envia para o adversário.
 
 ### Vantagens da Abordagem com Bitmask
 
-* ⚡ **Alta Performance**: Operações bitwise são extremamente rápidas.
-* 📦 **Sincronização Eficiente**: Transmissão compacta via `protobuf`.
-* 🧮 **Facilidade de Cálculo**: Colisões, explosões e gravidade usam simples verificações binárias.
+* **Alta Performance**: Operações bitwise são extremamente rápidas.
+* **Sincronização Eficiente**: Transmissão compacta via `protobuf`.
 
 ---
 
-## 🌐 Arquitetura de Rede
+## Arquitetura de Rede
 
-### 🔌 Fluxo de Conexão
+### Fluxo de Conexão
 
 ```mermaid
 sequenceDiagram
@@ -116,7 +114,7 @@ sequenceDiagram
 
 ---
 
-## ⚙️ Configuração do Cliente (`src/config.ts`)
+## Configuração do Cliente (`src/config/gameConfig.ts`)
 
 ```typescript
 // Dimensões do Mundo
@@ -141,17 +139,19 @@ export const EXPLOSION_DAMAGE = 35;      // HP por acerto direto
 // Gerenciamento de Turno
 export const TURN_TIME_SEC = 20;          // duração do turno (s)
 export const DYNAMIC_UPDATE_INTERVAL_MS = 100; // intervalo de sync (ms)
+
+// ...
 ```
 
 ---
 
-## 📜 Esquema de Protocol Buffers
+## Esquema de Protocol Buffers
 
 ### Por que Protobuf?
 
+* **Serialização Eficiente**: Compacta dados para transmissão rápida.
 * **Redução de 87%** no tamanho de payload comparado ao JSON.
 * **Geração de código tipado** para TypeScript e Python.
-* **Evolução compatível** com versões anteriores.
 
 ### Definição do Estado de Jogo (`game.proto`)
 
@@ -261,7 +261,7 @@ message Error {
 
 ---
 
-## 🔒 Modelo de Confiança
+## Modelo de Confiança
 
 **Sistema de Autoridade do Jogador Ativo**
 
@@ -276,23 +276,21 @@ graph LR
 ```
 
 * **No Seu Turno**:
-
   * Controle completo de posições e ângulos de ambos os jogadores.
   * Autoridade sobre projéteis e explosões.
   * Confirmação final das modificações no terreno.
 
 * **Enquanto Aguarda**:
-
   * Recebe e aplica estado remoto sem validação adicional.
   * Atualiza posições, vida e terreno conforme mensagens recebidas.
 
 ---
 
-## 🚀 Implantação
+## Implantação
 
 * **Endpoint WebSocket**: `ws://educautf.td.utfpr.edu.br/tankinho/`
 
 **Infraestrutura**:
 
 * Servidor WebSocket em Python (Docker).
-* Nginx como proxy reverso (SSL/TLS).
+* Nginx como proxy reverso.
