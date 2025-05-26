@@ -1,23 +1,70 @@
+Claro! Abaixo está uma versão aprimorada do seu README, incorporando explicações claras sobre os dois espaços de jogo — **environment space** e **screen space** — e detalhando como o jogo opera sobre o *environment space*. Também foi adicionada uma seção dedicada ao sistema de **terreno destrutível**, explicando como ele é representado e manipulado de forma eficiente usando uma *bitmask* binária.
+
+---
+
+````markdown
 # Tankinho: Jogo de Artilharia 2D com Terreno Destrutível
 
-![Demonstração de Gameplay](./game_banner.png)
+![Demonstração de Gameplay](./game_banner.png)  
 *Exemplo de jogo com destruição de terreno e trajetória de projétil.*
 
 ---
 
 ## 🎯 Visão Geral
 
-Tankinho é um duelo de artilharia 2D por turnos, jogado no navegador, com terreno totalmente destrutível. Cada jogador alterna disparos, destruindo obstáculos e modificando o campo de batalha. Inspirado em clássicos como *Worms* e *ShellShock*.
+**Tankinho** é um jogo 2D por turnos de artilharia, jogado diretamente no navegador. Dois jogadores se enfrentam em combates estratégicos, onde cada tiro pode alterar o terreno, abrir caminhos ou eliminar obstáculos. O jogo é inspirado em clássicos como *Worms* e *ShellShock*, combinando física realista com mapas totalmente destrutíveis.
 
 ---
 
 ## ✨ Principais Funcionalidades
 
-* **1v1 Online**: Enfrente amigos ou oponentes aleatórios.
-* **Terreno Dinâmico**: Destruição em tempo real usando sistema de bitmask.
-* **Física Realista**: Trajetória de projéteis influenciada por gravidade e vento.
-* **Sincronização por Turno**: Modelo de confiança simples que garante jogo fluido.
-* **Compatível com Qualquer Navegador**: Acesse de desktop ou dispositivo móvel.
+- ⚔️ **1v1 Online**: Partidas em tempo real contra amigos ou jogadores aleatórios.
+- 💣 **Terreno Destrutível**: Modifique o mapa com explosões — cada impacto altera a topografia do jogo.
+- 🌪️ **Física de Projéteis**: Com gravidade e vento afetando a trajetória.
+- 🔁 **Sistema de Turnos Sincronizados**: Controle confiável e previsível do jogo.
+- 🌐 **Jogue de Qualquer Lugar**: Compatível com navegadores desktop e mobile.
+
+---
+
+## 🧭 Espaços de Jogo: Environment vs. Screen Space
+
+O Tankinho trabalha com dois sistemas de coordenadas distintos para renderização e lógica de jogo:
+
+### 🌍 Environment Space
+- Representa o **mundo lógico do jogo**, medido em blocos.
+- Cada bloco é uma célula em uma matriz fixa (`WIDTH x HEIGHT`).
+- Toda a lógica de movimentação, colisão, explosão e alteração de terreno ocorre nesse espaço.
+- Exemplo: `(x=25, y=5)` significa a 25ª coluna e 5ª linha do mundo.
+
+### 🖥️ Screen Space
+- Representa o **espaço em pixels na tela**, usado para renderizar objetos no canvas.
+- Cada bloco do *environment* equivale a `BASE_BLOCK_SIZE` pixels no *screen space*.
+- O React-Konva faz a conversão automática entre os dois espaços.
+
+### 🔁 Relação entre os Espaços
+
+```plaintext
+screen_x = env_x * BASE_BLOCK_SIZE
+screen_y = env_y * BASE_BLOCK_SIZE
+````
+
+> Toda simulação acontece em *environment space*; o *screen space* é usado apenas para exibição visual.
+
+---
+
+## 🧨 Terreno Destrutível com Bitmask
+
+Para garantir alta performance e sincronização eficiente, o terreno é representado como uma **máscara de bits** (`bitmask`):
+
+* Cada bit representa uma célula: `1` indica **chão**; `0` indica **ar**.
+* O terreno completo é uma matriz comprimida em bytes para transmissão rápida.
+* Durante explosões, o jogo recalcula os blocos afetados e envia apenas o *delta* da bitmask.
+
+### Vantagens da Abordagem com Bitmask
+
+* ⚡ **Alta Performance**: Operações bitwise são extremamente rápidas.
+* 📦 **Sincronização Eficiente**: Transmissão compacta via `protobuf`.
+* 🧮 **Facilidade de Cálculo**: Colisões, explosões e gravidade usam simples verificações binárias.
 
 ---
 
@@ -44,79 +91,52 @@ sequenceDiagram
     participant Server
     participant Guest
 
-    %% Match Creation Phase
     Host->>Server: create_match()
     Server-->>Host: match_created (match_id)
-    
-    %% Guest Join Phase
     Guest->>Server: join_match(match_id)
-    Server-->>Guest: match_joined (confirmation)
+    Server-->>Guest: match_joined
     Server->>Host: SERVER_START_MATCH
     Server->>Guest: SERVER_START_MATCH
-    
-    %% Gameplay Phase (Host's Turn)
-    loop Every 300ms
-        Host->>Server: DynamicUpdate (both players' state)
-        Server->>Guest: Forward DynamicUpdate
+
+    loop Durante Turno
+        Ativo->>Server: DynamicUpdate
+        Server->>Passivo: Forward DynamicUpdate
     end
-    
-    Host->>Server: TurnUpdate (final state + bitmask)
-    Server->>Guest: Forward TurnUpdate
-    
-    %% Gameplay Phase (Guest's Turn)
-    loop Every 300ms
-        Guest->>Server: DynamicUpdate (both players' state)
-        Server->>Host: Forward DynamicUpdate
-    end
-    
-    Guest->>Server: TurnUpdate (final state + bitmask)
-    Server->>Host: Forward TurnUpdate
-    
-    %% Disconnection Handling
-    Host->>Server: disconnect_match()
-    Server->>Guest: ERROR_HOST_DISCONNECTED
+
+    Ativo->>Server: TurnUpdate (estado final + bitmask)
+    Server->>Passivo: Forward TurnUpdate
 ```
 
 ---
 
 ## ⚙️ Configuração do Cliente (`src/config.ts`)
 
-```typescript
-// Dimensões do Mundo
+```ts
 enum Environment {
-  WIDTH = 100,   // em blocos
+  WIDTH = 100,
   HEIGHT = 30,
-  BASE_BLOCK_SIZE = 40 // pixels por bloco (zoom 100%)
+  BASE_BLOCK_SIZE = 40
 }
 
-// Física dos Jogadores
-export const PLAYER_SPEED = 5;       // blocos/segundo
-export const PLAYER_GRAVITY = 9.8;   // blocos/s²
+export const PLAYER_SPEED = 5;
+export const PLAYER_GRAVITY = 9.8;
 export const INITIAL_PLAYER_POS = { x: 20, y: 1 };
 export const INITIAL_GUEST_POS = { x: 80, y: 1 };
 
-// Sistema de Combate
-export const SHOOTING_POWER_BARS = 30;   // níveis de carga
-export const BULLET_SPEED_FACTOR = 40;   // conversão em velocidade
-export const EXPLOSION_RADIUS = 2;       // raio em blocos
-export const EXPLOSION_DAMAGE = 35;      // HP por acerto direto
+export const SHOOTING_POWER_BARS = 30;
+export const BULLET_SPEED_FACTOR = 40;
+export const EXPLOSION_RADIUS = 2;
+export const EXPLOSION_DAMAGE = 35;
 
-// Gerenciamento de Turno
-export const TURN_TIME_SEC = 20;          // duração do turno (s)
-export const DYNAMIC_UPDATE_INTERVAL_MS = 100; // intervalo de sync (ms)
+export const TURN_TIME_SEC = 20;
+export const DYNAMIC_UPDATE_INTERVAL_MS = 100;
 ```
 
 ---
 
-## 📜 Esquema de Protocol Buffers
+## 📦 Protocol Buffers
 
-### Por que Protobuf?
-
-* **Redução de 87%** no tamanho de payload comparado ao JSON.
-* **Geração de código tipado** para TypeScript e Python.
-* **Evolução compatível** com versões anteriores.
-
-### Definição do Estado de Jogo (`game.proto`)
+### Exemplo: Estado de Jogo
 
 ```proto
 message DynamicUpdate {
@@ -127,34 +147,8 @@ message DynamicUpdate {
 }
 
 message TurnUpdate {
-  bytes bit_mask = 1;        // delta comprimido do terreno
+  bytes bit_mask = 1;              // delta do terreno
   DynamicUpdate dynamic_update = 3;
-}
-
-message Player {
-  Vec2 position = 1;
-  float aim_angle = 3;
-  uint32 health = 4;
-}
-```
-
-### Mensagens de Conexão (`connection.proto`)
-
-```proto
-message ClientMessage {
-  oneof message {
-    GameUpdate game_update = 1;
-    bool create_match = 2;
-    string join_match = 3;
-  }
-}
-
-message ServerMessage {
-  oneof message {
-    GameUpdate game_update = 1;
-    Error error = 2;
-    ServerFlags server_flags = 6;
-  }
 }
 ```
 
@@ -162,36 +156,28 @@ message ServerMessage {
 
 ## 🔒 Modelo de Confiança
 
-**Sistema de Autoridade do Jogador Ativo**
+**O jogador ativo possui autoridade total no seu turno:**
 
 ```mermaid
 graph LR
-    A[Jogador Ativo] -->|Controla| B[Posições de Ambos]
-    A -->|Controla| C[Projéteis]
-    A -->|Controla| D[Alterações no Terreno]
-    B --> E[Jogador Passivo]
-    C --> E
-    D --> E
+    A[Jogador Ativo] -->|Controla| B[Posições e Projéteis]
+    A -->|Atualiza| C[Bitmask do Terreno]
+    B --> D[Jogador Passivo]
+    C --> D
 ```
 
-* **No Seu Turno**:
-
-  * Controle completo de posições e ângulos de ambos os jogadores.
-  * Autoridade sobre projéteis e explosões.
-  * Confirmação final das modificações no terreno.
-
-* **Enquanto Aguarda**:
-
-  * Recebe e aplica estado remoto sem validação adicional.
-  * Atualiza posições, vida e terreno conforme mensagens recebidas.
+* O jogador inativo apenas replica o estado enviado.
+* A simulação local ocorre apenas no turno de quem joga.
 
 ---
 
 ## 🚀 Implantação
 
-* **Endpoint WebSocket**: `ws://educautf.td.utfpr.edu.br/tankinho/`
+* WebSocket Endpoint: `ws://educautf.td.utfpr.edu.br/tankinho/`
 
-**Infraestrutura**:
+**Infraestrutura:**
 
-* Servidor WebSocket em Python (Docker).
-* Nginx como proxy reverso (SSL/TLS).
+* Backend: Python WebSocket server (Docker)
+* Proxy: Nginx com suporte a SSL/TLS
+
+
