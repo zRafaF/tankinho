@@ -1,6 +1,6 @@
 # Tankinho: Jogo de Artilharia 2D com Terreno Destrutível
 
-![Demonstração de Gameplay](https://i.imgur.com/5XQj3Dl.png)
+![Demonstração de Gameplay](./game_banner.png)
 *Exemplo de jogo com destruição de terreno e trajetória de projétil.*
 
 ---
