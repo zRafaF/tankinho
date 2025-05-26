@@ -1,9 +1,10 @@
 import asyncio
 import websockets
 from gameserver import GameServer
+import os
 
-WS_HOST = "localhost"
-WS_PORT = 8765
+WS_HOST = os.getenv("WS_HOST", "localhost")
+WS_PORT = int(os.getenv("WS_PORT", "8765"))
 
 
 async def main():
