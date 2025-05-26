@@ -195,10 +195,3 @@ graph LR
 
 * Servidor WebSocket em Python (Docker).
 * Nginx como proxy reverso (SSL/TLS).
-* Auto-scaling (1–3 instâncias).
-
-**Desempenho Médio**:
-
-* Latência: 50 ms (mesma região).
-* \~150 partidas simultâneas por instância.
-* Banda: 15 KB/s por partida.
