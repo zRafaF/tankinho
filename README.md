@@ -92,22 +92,22 @@ sequenceDiagram
     Server->>Guest: SERVER_START_MATCH
     
     %% Gameplay Phase (Host's Turn)
-    loop Every 300ms
-        Host->>Server: DynamicUpdate (both players' state)
-        Server->>Guest: Forward DynamicUpdate
+    loop Todo 100ms
+        Host->>Server: DynamicUpdate (Estado de ambos jogadores)
+        Server->>Guest: Encaminha DynamicUpdate
     end
     
-    Host->>Server: TurnUpdate (final state + bitmask)
-    Server->>Guest: Forward TurnUpdate
+    Host->>Server: TurnUpdate (Estado final + bitmask)
+    Server->>Guest: Encaminha TurnUpdate
     
     %% Gameplay Phase (Guest's Turn)
-    loop Every 300ms
-        Guest->>Server: DynamicUpdate (both players' state)
-        Server->>Host: Forward DynamicUpdate
+    loop Todo 100ms
+        Guest->>Server: DynamicUpdate (Estado de ambos jogadores)
+        Server->>Host: Encaminha DynamicUpdate
     end
     
-    Guest->>Server: TurnUpdate (final state + bitmask)
-    Server->>Host: Forward TurnUpdate
+    Guest->>Server: TurnUpdate (Estado final + bitmask)
+    Server->>Host: Encaminha TurnUpdate
     
     %% Disconnection Handling
     Host->>Server: disconnect_match()
