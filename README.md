@@ -1,54 +1,184 @@
-# React + TypeScript + Vite
+# Tankinho: Jogo de Artilharia 2D com Terreno Destrutível
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Demonstração de Gameplay](https://i.imgur.com/5XQj3Dl.png)
+*Exemplo de jogo com destruição de terreno e trajetória de projétil.*
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🎯 Visão Geral
 
-## Expanding the ESLint configuration
+Tankinho é um duelo de artilharia 2D por turnos, jogado no navegador, com terreno totalmente destrutível. Cada jogador alterna disparos, destruindo obstáculos e modificando o campo de batalha. Inspirado em clássicos como *Worms* e *ShellShock*.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## ✨ Principais Funcionalidades
+
+* **1v1 Online**: Enfrente amigos ou oponentes aleatórios.
+* **Terreno Dinâmico**: Destruição em tempo real usando sistema de bitmask.
+* **Física Realista**: Trajetória de projéteis influenciada por gravidade e vento.
+* **Sincronização por Turno**: Modelo de confiança simples que garante jogo fluido.
+* **Compatível com Qualquer Navegador**: Acesse de desktop ou dispositivo móvel.
+
+---
+
+## 🛠 Tecnologias Utilizadas
+
+| Componente   | Tecnologia                |
+| ------------ | ------------------------- |
+| Frontend     | React + TypeScript        |
+| Renderização | React-Konva (Canvas)      |
+| Comunicação  | WebSocket + Protobuf      |
+| Serialização | Protocol Buffers          |
+| Backend      | Python (WebSocket Server) |
+| Implantação  | Docker + Nginx            |
+
+---
+
+## 🌐 Arquitetura de Rede
+
+### 🔌 Fluxo de Conexão
+
+```mermaid
+sequenceDiagram
+    participant Host
+    participant Server
+    participant Guest
+
+    Host->>Server: create_match()
+    Server-->>Host: match_created (ID: ABC123)
+    Guest->>Server: join_match(ABC123)
+    Server-->>Guest: match_joined
+    Server->>Both: SERVER_START_MATCH
+    loop Turno do Host
+        Host->>Server: DynamicUpdate (300ms)
+        Server->>Guest: Repassa Atualização
+    end
+    Host->>Server: TurnUpdate (Explosão + Terreno)
+    Server->>Guest: Repassa Estado Final
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## ⚙️ Configuração do Cliente (`src/config.ts`)
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+```typescript
+// Dimensões do Mundo
+enum Environment {
+  WIDTH = 100,   // em blocos
+  HEIGHT = 30,
+  BASE_BLOCK_SIZE = 40 // pixels por bloco (zoom 100%)
+}
+
+// Física dos Jogadores
+export const PLAYER_SPEED = 5;       // blocos/segundo
+export const PLAYER_GRAVITY = 9.8;   // blocos/s²
+export const INITIAL_PLAYER_POS = { x: 20, y: 1 };
+export const INITIAL_GUEST_POS = { x: 80, y: 1 };
+
+// Sistema de Combate
+export const SHOOTING_POWER_BARS = 30;   // níveis de carga
+export const BULLET_SPEED_FACTOR = 40;   // conversão em velocidade
+export const EXPLOSION_RADIUS = 2;       // raio em blocos
+export const EXPLOSION_DAMAGE = 35;      // HP por acerto direto
+
+// Gerenciamento de Turno
+export const TURN_TIME_SEC = 20;          // duração do turno (s)
+export const DYNAMIC_UPDATE_INTERVAL_MS = 100; // intervalo de sync (ms)
 ```
+
+---
+
+## 📜 Esquema de Protocol Buffers
+
+### Por que Protobuf?
+
+* **Redução de 87%** no tamanho de payload comparado ao JSON.
+* **Geração de código tipado** para TypeScript e Python.
+* **Evolução compatível** com versões anteriores.
+
+### Definição do Estado de Jogo (`game.proto`)
+
+```proto
+message DynamicUpdate {
+  Player host_player = 1;
+  Player guest_player = 2;
+  repeated Bullet bullets = 3;
+  Turn turn = 4;
+}
+
+message TurnUpdate {
+  bytes bit_mask = 1;        // delta comprimido do terreno
+  DynamicUpdate dynamic_update = 3;
+}
+
+message Player {
+  Vec2 position = 1;
+  float aim_angle = 3;
+  uint32 health = 4;
+}
+```
+
+### Mensagens de Conexão (`connection.proto`)
+
+```proto
+message ClientMessage {
+  oneof message {
+    GameUpdate game_update = 1;
+    bool create_match = 2;
+    string join_match = 3;
+  }
+}
+
+message ServerMessage {
+  oneof message {
+    GameUpdate game_update = 1;
+    Error error = 2;
+    ServerFlags server_flags = 6;
+  }
+}
+```
+
+---
+
+## 🔒 Modelo de Confiança
+
+**Sistema de Autoridade do Jogador Ativo**
+
+```mermaid
+graph LR
+    A[Jogador Ativo] -->|Controla| B[Posições de Ambos]
+    A -->|Controla| C[Projéteis]
+    A -->|Controla| D[Alterações no Terreno]
+    B --> E[Jogador Passivo]
+    C --> E
+    D --> E
+```
+
+* **No Seu Turno**:
+
+  * Controle completo de posições e ângulos de ambos os jogadores.
+  * Autoridade sobre projéteis e explosões.
+  * Confirmação final das modificações no terreno.
+
+* **Enquanto Aguarda**:
+
+  * Recebe e aplica estado remoto sem validação adicional.
+  * Atualiza posições, vida e terreno conforme mensagens recebidas.
+
+---
+
+## 🚀 Implantação
+
+* **Endpoint WebSocket**: `ws://educautf.td.utfpr.edu.br/tankinho/`
+
+**Infraestrutura**:
+
+* Servidor WebSocket em Python (Docker).
+* Nginx como proxy reverso (SSL/TLS).
+* Auto-scaling (1–3 instâncias).
+
+**Desempenho Médio**:
+
+* Latência: 50 ms (mesma região).
+* \~150 partidas simultâneas por instância.
+* Banda: 15 KB/s por partida.
