@@ -324,13 +324,17 @@ export default function GameScreen({
   useEffect(() => {
     if (!latestOpponentState) return;
 
-    const theirTurn = latestOpponentState.turn;
-    if (theirTurn !== currentTurn) {
-      setCurrentTurn(theirTurn);
-      if (theirTurn === (isHost ? Turn.HOST : Turn.GUEST)) {
-        setRoundState("player");
-        setTurnTime(TURN_TIME_SEC);
-      }
+    // Always update the opponent state
+    const opponentPlayer = isHost
+      ? latestOpponentState.guestPlayer
+      : latestOpponentState.hostPlayer;
+    if (opponentPlayer) {
+      setOpponentPos({
+        x: opponentPlayer.position?.x ?? 0,
+        y: opponentPlayer.position?.y ?? 0,
+      });
+      setOpponentAngle(opponentPlayer.aimAngle ?? 0);
+      setOpponentHealth(opponentPlayer.health ?? 100);
     }
 
     setHealth(
@@ -338,7 +342,20 @@ export default function GameScreen({
         ? latestOpponentState.hostPlayer?.health ?? 100
         : latestOpponentState.guestPlayer?.health ?? 100
     );
-  }, [latestOpponentState, currentTurn, isHost, setCurrentTurn]);
+
+    // Only update turn state if this is a turnUpdate (not dynamicUpdate)
+    if (
+      latestOpponentState.turn !== undefined &&
+      latestOpponentState.turn !== currentTurn
+    ) {
+      if (latestOpponentState.turn === (isHost ? Turn.HOST : Turn.GUEST)) {
+        setRoundState("player");
+        setTurnTime(TURN_TIME_SEC);
+      } else {
+        setRoundState("other");
+      }
+    }
+  }, [latestOpponentState, isHost]);
 
   // Turn timer (now truly counts down and ends your turn)
   useEffect(() => {
