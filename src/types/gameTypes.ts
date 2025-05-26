@@ -13,3 +13,8 @@ export interface Explosion {
 }
 
 export type RoundState = "player" | "bullet" | "other";
+
+export type GameOverState = {
+  isGameOver: boolean;
+  isWinner: boolean;
+};

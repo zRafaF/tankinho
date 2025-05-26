@@ -24,7 +24,12 @@ import {
   TurnUpdateSchema,
   Vec2Schema,
 } from "@/gen/proto/game_pb";
-import type { Bullet, Explosion, RoundState } from "@/types/gameTypes";
+import type {
+  Bullet,
+  Explosion,
+  GameOverState,
+  RoundState,
+} from "@/types/gameTypes";
 import {
   calculateExplosionEffects,
   computeGroundY,
@@ -84,6 +89,11 @@ export default function GameScreen({
   );
   const [opponentAngle, setOpponentAngle] = useState(0);
   const [opponentHealth, setOpponentHealth] = useState(100);
+
+  const [gameOver, setGameOver] = useState<GameOverState>({
+    isGameOver: false,
+    isWinner: false,
+  });
 
   // Initialize game start
   useEffect(() => {
@@ -269,7 +279,7 @@ export default function GameScreen({
 
   // Turn timer (now truly counts down and ends your turn)
   useEffect(() => {
-    if (roundState !== "player") return;
+    if (roundState !== "player" || !gameStarted) return;
 
     let animationFrameId: number;
     const startTime = Date.now();
@@ -280,7 +290,7 @@ export default function GameScreen({
       const { bullets: pBullets } = latestState.current;
       if (remaining <= 0) {
         setTurnTime(0);
-        endTurn(bitmask, pBullets, health, opponentHealth); // send updates, swap turns
+        endTurn(bitmask, pBullets, health, opponentHealth);
         return;
       }
 
@@ -290,7 +300,7 @@ export default function GameScreen({
 
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [roundState]); // endTurn is stable via useCallback
+  }, [roundState, gameStarted]);
 
   // Mouse movement for aiming
   useEffect(() => {
