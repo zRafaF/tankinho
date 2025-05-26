@@ -156,42 +156,106 @@ export const DYNAMIC_UPDATE_INTERVAL_MS = 100; // intervalo de sync (ms)
 ### Definição do Estado de Jogo (`game.proto`)
 
 ```proto
+syntax = "proto3";
+
+enum Turn {
+  TURN_HOST = 0;
+  TURN_GUEST = 1;
+}
+
+message Vec2 {
+  float x = 1;
+  float y = 2;
+}
+
+message Bullet {
+  Vec2 position = 1;
+  Vec2 velocity = 2;
+}
+
+message Player {
+  Vec2 position = 1;
+  Vec2 velocity = 2;
+  float aim_angle = 3;
+  uint32 health = 4;
+  uint32 time_left = 5;
+}
+
 message DynamicUpdate {
   Player host_player = 1;
   Player guest_player = 2;
+
   repeated Bullet bullets = 3;
   Turn turn = 4;
 }
 
 message TurnUpdate {
-  bytes bit_mask = 1;        // delta comprimido do terreno
+  bytes bit_mask = 1;
   DynamicUpdate dynamic_update = 3;
 }
 
-message Player {
-  Vec2 position = 1;
-  float aim_angle = 3;
-  uint32 health = 4;
+message GameUpdate {
+  string match_id = 1;
+  oneof data {
+    DynamicUpdate dynamic_update = 2;
+    TurnUpdate turn_update = 3;
+  }
 }
 ```
 
 ### Mensagens de Conexão (`connection.proto`)
 
 ```proto
+syntax = "proto3";
+
+import "game.proto";
+
 message ClientMessage {
+  enum ClientFlags {
+    NONE = 0;
+  }
+  
   oneof message {
     GameUpdate game_update = 1;
     bool create_match = 2;
     string join_match = 3;
+    ClientFlags client_flags = 4;
+    string disconnect_match = 5; // match id
   }
 }
 
 message ServerMessage {
+  message MatchCreationOrJoin {
+    string match_id = 1;
+    uint32 player_id = 2;
+  }
+
+  enum ServerFlags {
+    SERVER_START_MATCH = 0;
+  }
+
   oneof message {
     GameUpdate game_update = 1;
     Error error = 2;
+    bool success = 3;
+    MatchCreationOrJoin match_created = 4;
+    MatchCreationOrJoin match_joined = 5;
     ServerFlags server_flags = 6;
   }
+}
+
+message Error {
+    string message = 1;
+    Type type = 2;    
+
+    enum Type {
+        ERROR_NONE = 0;
+        ERROR_MATCH_NOT_FOUND = 1;
+        ERROR_MATCH_FULL = 2;
+        ERROR_UNKNOWN = 3;
+        ERROR_HOST_DISCONNECTED = 4;
+        ERROR_GUEST_DISCONNECTED = 5;
+    }
 }
 ```
 
