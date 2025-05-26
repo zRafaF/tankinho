@@ -43,6 +43,8 @@ function PlayerInner({
     posRef.current = { x, y };
   }, [x, y]);
 
+  console.log(isTurnActive);
+
   // Handle input for local player
   useEffect(() => {
     if (!isLocalPlayer) return;

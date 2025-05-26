@@ -166,7 +166,8 @@ export const GameConnectionProvider = ({
 
                   console.log(turnUpdate);
 
-                  setCurrentTurn(turnUpdate.turn);
+                  setCurrentTurn(turnUpdate.dynamicUpdate!.turn);
+                  setLatestOpponentState(turnUpdate.dynamicUpdate!);
                   setBitmask(turnUpdate.bitMask);
                   break;
               }

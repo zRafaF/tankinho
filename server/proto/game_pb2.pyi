@@ -56,12 +56,12 @@ class DynamicUpdate(_message.Message):
     def __init__(self, host_player: _Optional[_Union[Player, _Mapping]] = ..., guest_player: _Optional[_Union[Player, _Mapping]] = ..., bullets: _Optional[_Iterable[_Union[Bullet, _Mapping]]] = ..., turn: _Optional[_Union[Turn, str]] = ...) -> None: ...
 
 class TurnUpdate(_message.Message):
-    __slots__ = ("bit_mask", "turn")
+    __slots__ = ("bit_mask", "dynamic_update")
     BIT_MASK_FIELD_NUMBER: _ClassVar[int]
-    TURN_FIELD_NUMBER: _ClassVar[int]
+    DYNAMIC_UPDATE_FIELD_NUMBER: _ClassVar[int]
     bit_mask: bytes
-    turn: Turn
-    def __init__(self, bit_mask: _Optional[bytes] = ..., turn: _Optional[_Union[Turn, str]] = ...) -> None: ...
+    dynamic_update: DynamicUpdate
+    def __init__(self, bit_mask: _Optional[bytes] = ..., dynamic_update: _Optional[_Union[DynamicUpdate, _Mapping]] = ...) -> None: ...
 
 class GameUpdate(_message.Message):
     __slots__ = ("match_id", "dynamic_update", "turn_update")

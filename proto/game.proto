@@ -33,7 +33,7 @@ message DynamicUpdate {
 
 message TurnUpdate {
   bytes bit_mask = 1;
-  Turn turn = 2;
+  DynamicUpdate dynamic_update = 3;
 }
 
 message GameUpdate {

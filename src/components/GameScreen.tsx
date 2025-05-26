@@ -62,7 +62,6 @@ export default function GameScreen({
   const [isCharging, setIsCharging] = useState(false);
   const [powerBars, setPowerBars] = useState(1);
 
-  const [opponentBullets, setOpponentBullets] = useState<Bullet[]>([]);
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const nextBulletId = useRef(1);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
@@ -113,7 +112,10 @@ export default function GameScreen({
   }, [latestOpponentState, isHost]);
 
   useEffect(() => {
-    if (!latestOpponentState?.bullets) return;
+    if (!latestOpponentState?.bullets) {
+      setBullets([]);
+      return;
+    }
     const obs: Bullet[] = latestOpponentState.bullets.map((b, idx) => ({
       id: idx,
       x: b.position?.x ?? 0,
@@ -121,7 +123,7 @@ export default function GameScreen({
       vx: b.velocity?.x ?? 0,
       vy: b.velocity?.y ?? 0,
     }));
-    setOpponentBullets(obs);
+    setBullets(obs);
   }, [latestOpponentState]);
 
   // Dynamic updates
@@ -180,18 +182,11 @@ export default function GameScreen({
     sendDynamicUpdate(dynamic);
   };
 
-  // --- helper to send both DynamicUpdate + TurnUpdate + local switch ---
-  const endTurn = useCallback(() => {
+  const endTurn = (newBitmask: Uint8Array, newBullets: Bullet[]) => {
     const newTurn = isHost ? Turn.GUEST : Turn.HOST;
 
     // marshal “me”
-    const {
-      playerPos,
-      turretAngle,
-      bullets: currentB,
-      health,
-      turnTime,
-    } = latestState.current;
+    const { playerPos, turretAngle, health, turnTime } = latestState.current;
     const me = create(PlayerSchema, {
       position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
       velocity: create(Vec2Schema, { x: 0, y: 0 }),
@@ -210,7 +205,7 @@ export default function GameScreen({
     const dynamic = create(DynamicUpdateSchema, {
       hostPlayer: isHost ? me : opponent,
       guestPlayer: !isHost ? me : opponent,
-      bullets: currentB.map((b) =>
+      bullets: newBullets.map((b) =>
         create(BulletSchema, {
           position: create(Vec2Schema, { x: b.x, y: b.y }),
           velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
@@ -218,26 +213,18 @@ export default function GameScreen({
       ),
       turn: newTurn,
     });
-    sendDynamicUpdate(dynamic);
 
     // 2) send TurnUpdate using the latest bitmaskRef
     const turnMsg = create(TurnUpdateSchema, {
-      bitMask: bitmask,
-      turn: newTurn,
+      bitMask: newBitmask,
+      dynamicUpdate: dynamic,
     });
     sendTurnUpdate(turnMsg);
 
     // 3) switch locally
     setCurrentTurn(newTurn);
     setRoundState("other");
-  }, [
-    isHost,
-    latestOpponentState,
-    sendDynamicUpdate,
-    sendTurnUpdate,
-    setCurrentTurn,
-    setRoundState,
-  ]);
+  };
 
   useEffect(() => {
     if (!isMyTurn || roundState === "other") return;
@@ -247,59 +234,58 @@ export default function GameScreen({
     return () => clearInterval(id);
   }, [isMyTurn, roundState, sendDynamicUpdate, currentTurn]);
 
-  // Handle turn transitions when bullets are done
-  useEffect(() => {
-    if (roundState !== "bullet" || bullets.length > 0) return;
+  // // Handle turn transitions when bullets are done
+  // useEffect(() => {
+  //   if (roundState !== "bullet" || bullets.length > 0) return;
 
-    // 1) send one last DynamicUpdate with the NEW turn baked in
-    const {
-      playerPos,
-      turretAngle,
-      bullets: currentBullets,
-      health,
-      turnTime,
-    } = latestState.current;
-    const newTurn = isHost ? Turn.GUEST : Turn.HOST;
+  //   // 1) send one last DynamicUpdate with the NEW turn baked in
+  //   const {
+  //     playerPos,
+  //     turretAngle,
+  //     bullets: currentBullets,
+  //     health,
+  //     turnTime,
+  //   } = latestState.current;
+  //   const newTurn = isHost ? Turn.GUEST : Turn.HOST;
 
-    // marshal “me”
-    const me = create(PlayerSchema, {
-      position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
-      velocity: create(Vec2Schema, { x: 0, y: 0 }),
-      aimAngle: turretAngle,
-      health,
-      timeLeft: turnTime,
-    });
-    // opponent from last known state
-    const opponent = latestOpponentState
-      ? isHost
-        ? latestOpponentState.guestPlayer
-        : latestOpponentState.hostPlayer
-      : undefined;
+  //   // marshal “me”
+  //   const me = create(PlayerSchema, {
+  //     position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
+  //     velocity: create(Vec2Schema, { x: 0, y: 0 }),
+  //     aimAngle: turretAngle,
+  //     health,
+  //     timeLeft: turnTime,
+  //   });
+  //   // opponent from last known state
+  //   const opponent = latestOpponentState
+  //     ? isHost
+  //       ? latestOpponentState.guestPlayer
+  //       : latestOpponentState.hostPlayer
+  //     : undefined;
 
-    const dynamic = create(DynamicUpdateSchema, {
-      hostPlayer: isHost ? me : opponent,
-      guestPlayer: !isHost ? me : opponent,
-      bullets: currentBullets.map((b) =>
-        create(BulletSchema, {
-          position: create(Vec2Schema, { x: b.x, y: b.y }),
-          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
-        })
-      ),
-      turn: newTurn,
-    });
-    sendDynamicUpdate(dynamic);
+  //   const dynamic = create(DynamicUpdateSchema, {
+  //     hostPlayer: isHost ? me : opponent,
+  //     guestPlayer: !isHost ? me : opponent,
+  //     bullets: currentBullets.map((b) =>
+  //       create(BulletSchema, {
+  //         position: create(Vec2Schema, { x: b.x, y: b.y }),
+  //         velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+  //       })
+  //     ),
+  //     turn: newTurn,
+  //   });
 
-    // 2) now send the TurnUpdate with the up-to-date bitmask
-    const turnMsg = create(TurnUpdateSchema, {
-      bitMask: bitmask,
-      turn: newTurn,
-    });
-    sendTurnUpdate(turnMsg);
+  //   // 2) now send the TurnUpdate with the up-to-date bitmask
+  //   const turnMsg = create(TurnUpdateSchema, {
+  //     bitMask: bitmask,
+  //     turn: newTurn,
+  //   });
+  //   sendTurnUpdate(turnMsg);
 
-    // 3) locally switch
-    setCurrentTurn(newTurn);
-    setRoundState("other");
-  }, [roundState, bullets.length, bitmask]);
+  //   // 3) locally switch
+  //   setCurrentTurn(newTurn);
+  //   setRoundState("other");
+  // }, [roundState, bullets.length, bitmask]);
 
   // Handle incoming turn updates
   useEffect(() => {
@@ -325,10 +311,10 @@ export default function GameScreen({
     const tick = () => {
       const elapsed = Date.now() - startTime;
       const remaining = TURN_TIME_SEC - Math.floor(elapsed / 1000);
-
+      const { bullets: pBullets } = latestState.current;
       if (remaining <= 0) {
         setTurnTime(0);
-        endTurn(); // send updates, swap turns
+        endTurn(bitmask, pBullets); // send updates, swap turns
         return;
       }
 
@@ -419,9 +405,41 @@ export default function GameScreen({
   useEffect(() => {
     if (health <= 0) {
       const newTurn = isHost ? Turn.GUEST : Turn.HOST;
+
+      const { playerPos, turretAngle, bullets, health, turnTime } =
+        latestState.current;
+
+      const me = create(PlayerSchema, {
+        position: create(Vec2Schema, { x: playerPos.x, y: playerPos.y }),
+        velocity: create(Vec2Schema, { x: 0, y: 0 }),
+        aimAngle: turretAngle,
+        health,
+        timeLeft: turnTime,
+      });
+
+      const bulletMessages = bullets.map((b) =>
+        create(BulletSchema, {
+          position: create(Vec2Schema, { x: b.x, y: b.y }),
+          velocity: create(Vec2Schema, { x: b.vx, y: b.vy }),
+        })
+      );
+
+      const opponent = latestOpponentState
+        ? isHost
+          ? latestOpponentState.guestPlayer
+          : latestOpponentState.hostPlayer
+        : undefined;
+
+      const dynamic = create(DynamicUpdateSchema, {
+        hostPlayer: isHost ? me : opponent,
+        guestPlayer: !isHost ? me : opponent,
+        bullets: bulletMessages,
+        turn: currentTurn,
+      });
+
       const update = create(TurnUpdateSchema, {
         bitMask: bitmask,
-        turn: newTurn,
+        dynamicUpdate: dynamic,
       });
       sendTurnUpdate(update);
       setCurrentTurn(newTurn);
@@ -448,8 +466,12 @@ export default function GameScreen({
 
     setBitmask(newBitmask);
 
-    setBullets((bs) => bs.filter((b) => b.id !== bid));
+    const newBullets = bullets.filter((b) => b.id !== bid);
+
+    setBullets(newBullets);
     if (damage > 0) setHealth((h) => Math.max(0, h - damage));
+
+    endTurn(newBitmask, newBullets); // send updates, swap turns
   };
 
   const handleExit = () => {
@@ -504,10 +526,7 @@ export default function GameScreen({
             isTurnActive={false}
             isLocalPlayer={false}
           />
-          <Bullets
-            bullets={[...bullets, ...opponentBullets]}
-            blockSize={blockSize}
-          />
+          <Bullets bullets={[...bullets]} blockSize={blockSize} />
           <Explosions explosions={explosions} blockSize={blockSize} />
         </Layer>
       </Stage>
