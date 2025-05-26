@@ -8,7 +8,7 @@ permissions:
 jobs:
   deploy:
     env:
-      VITE_WS_SERVER: ws://localhost:8765
+      VITE_WS_SERVER: wss://educautf.td.utfpr.edu.br/tankinho/
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
