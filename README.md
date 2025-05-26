@@ -3,6 +3,13 @@
 ![Demonstração de Gameplay](./game_banner.png)
 *Exemplo de jogo com destruição de terreno e trajetória de projétil.*
 
+
+## Acesse agora mesmo!
+
+[![Jogue agora!](https://img.shields.io/badge/Jogue%20Agora-Online-blue?style=for-the-badge)](https://github.com/zrafaf/tankinho)
+
+### <https://github.com/zrafaf/tankinho>
+
 ---
 
 ## Visão Geral
