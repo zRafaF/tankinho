@@ -6,9 +6,9 @@
 
 ## Acesse agora mesmo!
 
-[![Jogue agora!](https://img.shields.io/badge/Jogue%20Agora-Online-blue?style=for-the-badge)](https://github.com/zrafaf/tankinho)
+[![Jogue agora!](https://img.shields.io/badge/Jogue%20Agora-Online-blue?style=for-the-badge)](https://zrafaf.github.io/tankinho/)
 
-### <https://github.com/zrafaf/tankinho>
+### <https://zrafaf.github.io/tankinho/>
 
 ---
 
