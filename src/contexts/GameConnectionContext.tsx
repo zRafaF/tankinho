@@ -151,6 +151,7 @@ export const GameConnectionProvider = ({
                 ServerMessage_ServerFlags.SERVER_START_MATCH
               ) {
                 onStartMatch?.();
+                setBitmask(createTerrain());
               }
               break;
 

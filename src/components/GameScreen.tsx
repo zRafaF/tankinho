@@ -108,6 +108,19 @@ export default function GameScreen({
     }
   }, [gameStarted]);
 
+  useEffect(() => {
+    const bottomLimit = ENVIRONMENT_HEIGHT - 1;
+    if (playerPos.y >= bottomLimit) {
+      setHealth(0);
+    }
+  }, [playerPos]);
+
+  useEffect(() => {
+    const bottomLimit = ENVIRONMENT_HEIGHT - 1;
+    if (opponentPos.y >= bottomLimit) {
+      setOpponentHealth(0);
+    }
+  }, [opponentPos]);
   // Sync opponent state
   useEffect(() => {
     if (!latestOpponentState) return;
