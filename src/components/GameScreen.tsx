@@ -36,6 +36,9 @@ import {
   updateBulletPhysics,
 } from "@/lib/gameHelpers";
 import { Bullets, Explosions } from "./game/GameElements";
+import { Button } from "./ui/button";
+import { ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function GameScreen({
   onExitGame,
@@ -216,13 +219,9 @@ export default function GameScreen({
         : latestOpponentState.hostPlayer
       : undefined;
 
-    console.log("opponent before update ", opponent);
-
     if (opponent) {
       opponent.health = opponentsHealth;
     }
-
-    console.log("new opponent ", opponent);
 
     // 1) send final DynamicUpdate
     const dynamic = create(DynamicUpdateSchema, {
@@ -304,17 +303,26 @@ export default function GameScreen({
 
   // Mouse movement for aiming
   useEffect(() => {
-    if (roundState !== "player" || !isMyTurn) return;
-    const onMove = (e: MouseEvent) => {
-      if (!stageRef.current) return;
-      const rect = stageRef.current.container().getBoundingClientRect();
+    if (roundState !== "player" || !isMyTurn || !gameStarted) return;
+
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = stage.container().getBoundingClientRect();
       const wx = (e.clientX - rect.left) / blockSize;
       const wy = (e.clientY - rect.top) / blockSize;
       setTurretAngle(Math.atan2(wy - playerPos.y, wx - playerPos.x));
     };
-    window.addEventListener("mousemove", onMove);
-    return () => window.removeEventListener("mousemove", onMove);
-  }, [roundState, playerPos, blockSize, isMyTurn]);
+
+    // Add event listener to the stage container instead of window
+    const container = stage.container();
+    container.addEventListener("mousemove", handleMouseMove);
+
+    return () => {
+      container.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [roundState, playerPos, blockSize, isMyTurn, gameStarted]);
 
   // Shooting controls
   useEffect(() => {
@@ -358,6 +366,17 @@ export default function GameScreen({
     return () => clearInterval(id);
   }, [roundState, isCharging, isMyTurn]);
 
+  // clean up when game over occurs
+  useEffect(() => {
+    if (!gameOver.isGameOver) return;
+
+    // Clear any pending intervals or animations
+    return () => {
+      // This will run when component unmounts or when gameOver changes
+      // No need to manually clean up as React will handle it
+    };
+  }, [gameOver.isGameOver]);
+
   // Bullet physics
   useEffect(() => {
     if (roundState !== "bullet") return;
@@ -379,9 +398,15 @@ export default function GameScreen({
 
   // Check for game over
   useEffect(() => {
-    if (health <= 0) {
-      const newTurn = isHost ? Turn.GUEST : Turn.HOST;
+    if ((health <= 0 || opponentHealth <= 0) && !gameOver.isGameOver) {
+      const isWinner = opponentHealth <= 0;
+      setGameOver({
+        isGameOver: true,
+        isWinner,
+      });
 
+      // Send final update (only if not already game over)
+      const newTurn = isHost ? Turn.GUEST : Turn.HOST;
       const { playerPos, turretAngle, bullets, health, turnTime } =
         latestState.current;
 
@@ -410,7 +435,7 @@ export default function GameScreen({
         hostPlayer: isHost ? me : opponent,
         guestPlayer: !isHost ? me : opponent,
         bullets: bulletMessages,
-        turn: currentTurn,
+        turn: newTurn,
       });
 
       const update = create(TurnUpdateSchema, {
@@ -421,7 +446,36 @@ export default function GameScreen({
       setCurrentTurn(newTurn);
       setRoundState("other");
     }
-  }, [health, bitmask, isHost, sendTurnUpdate, setCurrentTurn]);
+  }, [
+    health,
+    opponentHealth,
+    bitmask,
+    isHost,
+    sendTurnUpdate,
+    setCurrentTurn,
+    gameOver.isGameOver,
+  ]);
+
+  // Add this resize handler effect
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    // Set initial size
+    handleResize();
+
+    // Add event listener
+    window.addEventListener("resize", handleResize);
+
+    // Clean up
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   const triggerExplosion = (bid: number, wx: number, wy: number) => {
     if (explodedBullets.current.has(bid)) return;
@@ -488,6 +542,37 @@ export default function GameScreen({
 
   return (
     <div className="relative w-full h-screen bg-gray-900 overflow-hidden">
+      {gameOver.isGameOver && (
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center">
+          <div className="text-center p-8 bg-gray-800/90 rounded-xl border border-purple-500/30">
+            <h2 className="text-4xl font-bold mb-4">
+              {gameOver.isWinner ? "You Won!" : "You Lost!"}
+            </h2>
+            <p
+              className={cn(
+                "text-xl mb-6",
+                gameOver.isWinner ? "text-green-400" : "text-red-400"
+              )}
+            >
+              {gameOver.isWinner
+                ? "Congratulations!"
+                : "Better luck next time!"}
+            </p>
+            <Button
+              onClick={() => {
+                disconnectFromMatch();
+                onExitGame();
+              }}
+              variant="outline"
+              size="lg"
+              className="bg-black/50 border-red-500/30 hover:bg-red-900/30 text-white"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Menu
+            </Button>
+          </div>
+        </div>
+      )}
       <Stage
         ref={stageRef}
         width={windowSize.width}

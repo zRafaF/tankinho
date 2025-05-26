@@ -98,7 +98,6 @@ class GameServer:
                 if game_update.dynamic_update.turn == Turn.TURN_HOST
                 else match.host_connection
             )
-            print(f"Dynamic update received")
             if target_ws is not None:
                 response = ServerMessage()
                 response.game_update.dynamic_update.CopyFrom(game_update.dynamic_update)
@@ -110,7 +109,6 @@ class GameServer:
         elif game_update.HasField("turn_update"):
             response = ServerMessage()
             response.game_update.turn_update.CopyFrom(game_update.turn_update)
-            print(f"Turn update received")
             print(f"Turn update bit mask: {game_update.turn_update}")
             try:
                 await match.host_connection.send(response.SerializeToString())

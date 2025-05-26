@@ -52,7 +52,7 @@ export default function App() {
         ) : (
           <>
             <GameScreen
-              onExitGame={() => setGameState({ status: "connecting" })}
+              onExitGame={() => window.location.reload()}
               gameStarted={gameStarted}
             />
             {gameState.status === "waiting" && gameState.isHost && (
