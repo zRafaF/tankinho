@@ -44,17 +44,37 @@ sequenceDiagram
     participant Server
     participant Guest
 
+    %% Match Creation Phase
     Host->>Server: create_match()
-    Server-->>Host: match_created (ID: ABC123)
-    Guest->>Server: join_match(ABC123)
-    Server-->>Guest: match_joined
-    Server->>Both: SERVER_START_MATCH
-    loop Turno do Host
-        Host->>Server: DynamicUpdate (300ms)
-        Server->>Guest: Repassa Atualização
+    Server-->>Host: match_created (match_id)
+    
+    %% Guest Join Phase
+    Guest->>Server: join_match(match_id)
+    Server-->>Guest: match_joined (confirmation)
+    Server->>Host: SERVER_START_MATCH
+    Server->>Guest: SERVER_START_MATCH
+    
+    %% Gameplay Phase (Host's Turn)
+    loop Every 300ms
+        Host->>Server: DynamicUpdate (both players' state)
+        Server->>Guest: Forward DynamicUpdate
     end
-    Host->>Server: TurnUpdate (Explosão + Terreno)
-    Server->>Guest: Repassa Estado Final
+    
+    Host->>Server: TurnUpdate (final state + bitmask)
+    Server->>Guest: Forward TurnUpdate
+    
+    %% Gameplay Phase (Guest's Turn)
+    loop Every 300ms
+        Guest->>Server: DynamicUpdate (both players' state)
+        Server->>Host: Forward DynamicUpdate
+    end
+    
+    Guest->>Server: TurnUpdate (final state + bitmask)
+    Server->>Host: Forward TurnUpdate
+    
+    %% Disconnection Handling
+    Host->>Server: disconnect_match()
+    Server->>Guest: ERROR_HOST_DISCONNECTED
 ```
 
 ---
